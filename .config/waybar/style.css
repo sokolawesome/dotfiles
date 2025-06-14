@@ -1,0 +1,130 @@
+* {
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 14px;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+}
+
+window#waybar {
+    background: rgba(36, 39, 58, 0.95);
+    color: #cad3f5;
+    border-radius: 0px;
+    border: 2px solid rgba(137, 180, 250, 0.3);
+    margin: 5px 10px 0 10px;
+    padding: 0;
+}
+
+#workspaces {
+    background: rgba(54, 58, 79, 0.8);
+    border-radius: 0px;
+    margin: 5px;
+    padding: 0 8px;
+}
+
+#workspaces button {
+    padding: 4px 8px;
+    background: transparent;
+    color: #a5adcb;
+    border-radius: 0px;
+    margin: 2px;
+    transition: all 0.2s ease-in-out;
+    min-width: 25px;
+}
+
+#workspaces button.active {
+    background: rgba(137, 180, 250, 0.3);
+    color: #89b4fa;
+    box-shadow: inset 0 -2px 0 #89b4fa;
+}
+
+#workspaces button:hover {
+    background: rgba(137, 180, 250, 0.2);
+    color: #89b4fa;
+}
+
+#custom-menu {
+    background: rgba(237, 135, 150, 0.8);
+    color: #24273a;
+    border-radius: 0px;
+    margin: 5px 0 5px 5px;
+    padding: 0 12px;
+    font-size: 16px;
+    min-width: 30px;
+}
+
+#custom-menu:hover {
+    background: rgba(237, 135, 150, 1);
+}
+
+#window {
+    background: rgba(54, 58, 79, 0.6);
+    border-radius: 0px;
+    margin: 5px;
+    padding: 0 12px;
+    color: #b8c0e0;
+}
+
+#clock {
+    background: rgba(166, 218, 149, 0.8);
+    color: #24273a;
+    border-radius: 0px;
+    margin: 5px;
+    padding: 0 16px;
+    font-weight: bold;
+    min-width: 80px;
+}
+
+#pulseaudio,
+#network,
+#cpu,
+#memory,
+#tray {
+    background: rgba(54, 58, 79, 0.8);
+    border-radius: 0px;
+    margin: 5px 2px;
+    padding: 0 12px;
+    color: #cad3f5;
+    min-width: 60px;
+}
+
+#pulseaudio {
+    color: #89b4fa;
+}
+
+#network {
+    color: #8bd5ca;
+}
+
+#cpu {
+    color: #f4dbd6;
+}
+
+#memory {
+    color: #f0c6c6;
+}
+
+#custom-power {
+    background: rgba(237, 135, 150, 0.8);
+    color: #24273a;
+    border-radius: 0px;
+    margin: 5px 5px 5px 0;
+    padding: 0 12px;
+    font-size: 16px;
+    min-width: 30px;
+}
+
+#custom-power:hover {
+    background: rgba(237, 135, 150, 1);
+}
+
+tooltip {
+    background: rgba(36, 39, 58, 0.95);
+    border: 2px solid rgba(137, 180, 250, 0.3);
+    border-radius: 0px;
+    color: #cad3f5;
+}
+
+tooltip label {
+    color: #cad3f5;
+}
