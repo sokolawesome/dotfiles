@@ -1,3 +1,5 @@
+@import "../../.cache/wal/colors-waybar.css";
+
 * {
     font-family: "JetBrainsMono Nerd Font";
     font-size: 14px;
@@ -7,8 +9,8 @@
 }
 
 window#waybar {
-    background: rgba(36, 39, 58, 0.95);
-    color: #cad3f5;
+    background: @background;
+    color: @foreground;
     border-radius: 0px;
     border: 2px solid rgba(137, 180, 250, 0.3);
     margin: 5px 10px 0 10px;
@@ -25,7 +27,7 @@ window#waybar {
 #workspaces button {
     padding: 4px 8px;
     background: transparent;
-    color: #a5adcb;
+    color: @color7;
     border-radius: 0px;
     margin: 2px;
     transition: all 0.2s ease-in-out;
@@ -34,18 +36,18 @@ window#waybar {
 
 #workspaces button.active {
     background: rgba(137, 180, 250, 0.3);
-    color: #89b4fa;
-    box-shadow: inset 0 -2px 0 #89b4fa;
+    color: @color12;
+    box-shadow: inset 0 -2px 0 @color12;
 }
 
 #workspaces button:hover {
     background: rgba(137, 180, 250, 0.2);
-    color: #89b4fa;
+    color: @color12;
 }
 
 #custom-menu {
     background: rgba(237, 135, 150, 0.8);
-    color: #24273a;
+    color: @background;
     border-radius: 0px;
     margin: 5px 0 5px 5px;
     padding: 0 12px;
@@ -62,12 +64,12 @@ window#waybar {
     border-radius: 0px;
     margin: 5px;
     padding: 0 12px;
-    color: #b8c0e0;
+    color: @color6;
 }
 
 #clock {
     background: rgba(166, 218, 149, 0.8);
-    color: #24273a;
+    color: @background;
     border-radius: 0px;
     margin: 5px;
     padding: 0 16px;
@@ -84,29 +86,29 @@ window#waybar {
     border-radius: 0px;
     margin: 5px 2px;
     padding: 0 12px;
-    color: #cad3f5;
+    color: @foreground;
     min-width: 60px;
 }
 
 #pulseaudio {
-    color: #89b4fa;
+    color: @color12;
 }
 
 #network {
-    color: #8bd5ca;
+    color: @color4;
 }
 
 #cpu {
-    color: #f4dbd6;
+    color: @color1;
 }
 
 #memory {
-    color: #f0c6c6;
+    color: @color2;
 }
 
 #custom-power {
     background: rgba(237, 135, 150, 0.8);
-    color: #24273a;
+    color: @background;
     border-radius: 0px;
     margin: 5px 5px 5px 0;
     padding: 0 12px;
@@ -119,12 +121,12 @@ window#waybar {
 }
 
 tooltip {
-    background: rgba(36, 39, 58, 0.95);
+    background: @background;
     border: 2px solid rgba(137, 180, 250, 0.3);
     border-radius: 0px;
-    color: #cad3f5;
+    color: @foreground;
 }
 
 tooltip label {
-    color: #cad3f5;
+    color: @foreground;
 }
