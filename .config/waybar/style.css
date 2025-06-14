@@ -6,12 +6,13 @@
     min-height: 0;
     border: none;
     border-radius: 0;
+    padding: 0;
+    margin: 0;
 }
 
 window#waybar {
     background: @background;
     color: @foreground;
-    border-radius: 0px;
     border: 2px solid rgba(137, 180, 250, 0.3);
     margin: 5px 10px 0 10px;
     padding: 0;
@@ -19,18 +20,16 @@ window#waybar {
 
 #workspaces {
     background: rgba(54, 58, 79, 0.8);
-    border-radius: 0px;
     margin: 5px;
-    padding: 0 8px;
+    padding: 0 6px;
 }
 
 #workspaces button {
-    padding: 4px 8px;
+    padding: 6px 10px;
     background: transparent;
     color: @color7;
-    border-radius: 0px;
     margin: 2px;
-    transition: all 0.2s ease-in-out;
+    transition: background 0.2s ease-in-out;
     min-width: 25px;
 }
 
@@ -45,32 +44,32 @@ window#waybar {
     color: @color12;
 }
 
-#custom-menu {
+#custom-menu,
+#custom-power {
     background: rgba(237, 135, 150, 0.8);
     color: @background;
-    border-radius: 0px;
-    margin: 5px 0 5px 5px;
+    margin: 5px;
     padding: 0 12px;
     font-size: 16px;
     min-width: 30px;
 }
 
-#custom-menu:hover {
+#custom-menu:hover,
+#custom-power:hover {
     background: rgba(237, 135, 150, 1);
 }
 
 #window {
     background: rgba(54, 58, 79, 0.6);
-    border-radius: 0px;
     margin: 5px;
     padding: 0 12px;
     color: @color6;
+    min-width: 40px;
 }
 
 #clock {
     background: rgba(166, 218, 149, 0.8);
     color: @background;
-    border-radius: 0px;
     margin: 5px;
     padding: 0 16px;
     font-weight: bold;
@@ -83,8 +82,7 @@ window#waybar {
 #memory,
 #tray {
     background: rgba(54, 58, 79, 0.8);
-    border-radius: 0px;
-    margin: 5px 2px;
+    margin: 5px;
     padding: 0 12px;
     color: @foreground;
     min-width: 60px;
@@ -93,38 +91,22 @@ window#waybar {
 #pulseaudio {
     color: @color12;
 }
-
 #network {
     color: @color4;
 }
-
 #cpu {
     color: @color1;
 }
-
 #memory {
     color: @color2;
-}
-
-#custom-power {
-    background: rgba(237, 135, 150, 0.8);
-    color: @background;
-    border-radius: 0px;
-    margin: 5px 5px 5px 0;
-    padding: 0 12px;
-    font-size: 16px;
-    min-width: 30px;
-}
-
-#custom-power:hover {
-    background: rgba(237, 135, 150, 1);
 }
 
 tooltip {
     background: @background;
     border: 2px solid rgba(137, 180, 250, 0.3);
-    border-radius: 0px;
     color: @foreground;
+    padding: 6px 10px;
+    font-size: 13px;
 }
 
 tooltip label {
