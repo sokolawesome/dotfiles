@@ -1,0 +1,71 @@
+@import "~/.cache/wal/colors-rofi-dark"
+
+configuration {
+      display-drun: "󰀻 Apps";
+      display-window: "󰖯 Windows";
+      display-clipboard: "󰅇 Clipboard";
+      drun-display-format: "{name} [<span weight='light' size='small'><i>({generic})</i></span>]";
+      window-format: "{w} · {c} · {t}";
+      show-icons: true;
+      icon-theme: "Papirus-Dark";
+      font: "JetBrainsMono Nerd Font 12";
+    }
+
+* {
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
+
+window {
+    location: center;
+    width: 1000;
+    border-radius: 0px;
+    border: 2px;
+}
+
+inputbar {
+    font: "JetBrainsMono Nerd Font 14";
+    padding: 12px;
+    spacing: 12px;
+    children: [ icon-search, entry ];
+}
+
+icon-search {
+    expand: false;
+    filename: "search";
+    size: 28px;
+}
+
+icon-search, entry, element-icon, element-text {
+    vertical-align: 0.5;
+}
+
+entry {
+    font: inherit;
+}
+
+message {
+    border: 2px 0 0;
+}
+
+textbox {
+    padding: 8px 24px;
+}
+
+listview {
+    lines: 10;
+    columns: 1;
+    fixed-height: false;
+    border: 1px 0 0;
+}
+
+element {
+    padding: 8px 16px;
+    spacing: 16px;
+    background-color: transparent;
+}
+
+element-icon {
+    size: 1em;
+}
