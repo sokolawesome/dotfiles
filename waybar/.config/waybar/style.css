@@ -2,7 +2,7 @@
 
 * {
     font-family: "JetBrainsMono Nerd Font";
-    font-size: 14px;
+    font-size: 16px;
     min-height: 0;
     border: none;
     border-radius: 0;
@@ -15,12 +15,34 @@ window#waybar {
     color: @foreground;
     border: 2px solid @color12;
     margin: 5px 10px 0 10px;
-    padding: 0;
+}
+
+#workspaces,
+#clock,
+#pulseaudio,
+#network,
+#cpu,
+#memory,
+#tray,
+#window {
+    background: @color0;
+    margin: 5px 0;
+    padding: 0 12px;
+    color: @foreground;
+}
+
+#workspaces button:first-child,
+#clock,
+#pulseaudio,
+#network,
+#cpu,
+#memory,
+#tray {
+    border-left: 1px solid @background;
 }
 
 #workspaces {
     background: @color0;
-    margin: 5px;
     padding: 0 6px;
 }
 
@@ -28,7 +50,6 @@ window#waybar {
     padding: 6px 10px;
     background: transparent;
     color: @color7;
-    margin: 2px;
     transition: background 0.2s ease-in-out;
     min-width: 25px;
 }
@@ -48,10 +69,18 @@ window#waybar {
 #custom-power {
     background: @color1;
     color: @background;
-    margin: 5px;
+    margin: 5px 0;
     padding: 0 12px;
-    font-size: 16px;
+    font-size: 18px;
     min-width: 30px;
+}
+#custom-menu {
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+}
+#custom-power {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
 }
 
 #custom-menu:hover,
@@ -59,35 +88,10 @@ window#waybar {
     background: @color9;
 }
 
-#window {
-    background: @color0;
-    margin: 5px;
-    padding: 0 12px;
-    color: @color6;
-    min-width: 40px;
-}
-
 #clock {
-    background: @color2;
-    color: @background;
-    margin: 5px;
-    padding: 0 16px;
+    color: @color6;
     font-weight: bold;
-    min-width: 80px;
 }
-
-#pulseaudio,
-#network,
-#cpu,
-#memory,
-#tray {
-    background: @color0;
-    margin: 5px;
-    padding: 0 12px;
-    color: @foreground;
-    min-width: 60px;
-}
-
 #pulseaudio {
     color: @color12;
 }
@@ -99,6 +103,17 @@ window#waybar {
 }
 #memory {
     color: @color2;
+}
+
+#cpu.warning,
+#memory.warning {
+    background-color: @color11;
+    color: @background;
+}
+#cpu.critical,
+#memory.critical {
+    background-color: @color9;
+    color: @background;
 }
 
 tooltip {

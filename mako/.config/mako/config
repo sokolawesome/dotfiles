@@ -9,8 +9,7 @@ border-color=#88c0d0
 border-radius=0
 icons=0
 max-icon-size=64
-font=JetBrainsMono Nerd Font 13
-markup=full
+font=JetBrainsMono Nerd Font 16
 default-timeout=5000
 ignore-timeout=0
 

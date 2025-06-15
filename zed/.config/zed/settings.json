@@ -12,6 +12,6 @@
   "theme": {
     "mode": "system",
     "light": "pywal",
-    "dark": "One Dark"
+    "dark": "pywal"
   }
 }

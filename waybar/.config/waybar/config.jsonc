@@ -2,7 +2,7 @@
   "layer": "top",
   "position": "top",
   "height": 35,
-  "spacing": 5,
+  "spacing": 0,
   "modules-left": ["custom/menu", "hyprland/window"],
   "modules-center": ["hyprland/workspaces", "clock"],
   "modules-right": [
@@ -31,11 +31,6 @@
       "3": "3",
       "4": "4",
       "5": "5",
-      "6": "6",
-      "7": "7",
-      "8": "8",
-      "9": "9",
-      "10": "10",
     },
   },
 
@@ -48,21 +43,17 @@
   "clock": {
     "interval": 1,
     "format": " {:%H:%M}",
-    "format-alt": " {:%A, %B %d, %Y}",
+    "format-alt": " {:%A, %B %d}",
     "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
     "on-click-right": "notify-send ' Full Date' \"$(date '+%A, %B %d, %Y')\"",
   },
 
   "pulseaudio": {
     "format": "{icon} {volume}%",
-    "format-muted": "󰖁 {volume}%",
+    "format-muted": "󰖁 Muted",
     "format-icons": {
       "headphone": "󰋋",
-      "hands-free": "󱡏",
       "headset": "󰋎",
-      "phone": "",
-      "portable": "",
-      "car": "",
       "default": ["󰕿", "󰖀", "󰕾"],
     },
     "scroll-step": 5,
@@ -73,12 +64,10 @@
 
   "network": {
     "interval": 5,
-    "format-wifi": "󰤨 {essid} {signalStrength}%",
-    "format-ethernet": "󰈀 Connected",
-    "format-linked": "󰈀 {ifname}",
+    "format-wifi": "󰤨 {essid}",
+    "format-ethernet": "󰈀 {ifname}",
     "format-disconnected": "󰤭 Disconnected",
-    "tooltip-format-wifi": "󰤨 {essid}\nSignal: {signalStrength}%\nFrequency: {frequency}MHz",
-    "tooltip-format-ethernet": "󰈀 {ifname}\nIP: {ipaddr}",
+    "tooltip-format": "{ifname} via {gwaddr} \nIP: {ipaddr}\nDown: {bandwidthDownBytes}\nUp: {bandwidthUpBytes}",
     "on-click": "kitty -e nmtui",
   },
 
@@ -87,13 +76,21 @@
     "format": "󰍛 {usage}%",
     "tooltip": true,
     "on-click": "kitty -e btop",
+    "states": {
+      "warning": 70,
+      "critical": 90,
+    },
   },
 
   "memory": {
     "interval": 5,
     "format": "󰾆 {percentage}%",
-    "tooltip-format": "RAM: {used:0.1f}G / {total:0.1f}G\nSwap: {swapUsed} / {swapTotal}",
+    "tooltip-format": "RAM: {used:0.1f}G / {total:0.1f}G",
     "on-click": "kitty -e btop",
+    "states": {
+      "warning": 70,
+      "critical": 90,
+    },
   },
 
   "tray": {
