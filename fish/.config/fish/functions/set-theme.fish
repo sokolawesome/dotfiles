@@ -20,9 +20,9 @@ function set-theme -d "Apply a new theme based on a wallpaper"
     wal -i "$wallpaper_path" &> /dev/null
 
     echo "Applying Kvantum theme..."
-    mkdir -p "$HOME/.config/Kvantum/pywal"
-    cp "$HOME/.cache/wal/pywal.kvconfig" "$HOME/.config/Kvantum/pywal/pywal.kvconfig"
-    cp "$HOME/.cache/wal/pywal.svg" "$HOME/.config/Kvantum/pywal/pywal.svg"
+    mkdir -p "$DOTFILES_PATH/Kvantum/.config/Kvantum/pywal"
+    cp "$HOME/.cache/wal/pywal.kvconfig" "$DOTFILES_PATH/Kvantum/.config/Kvantum/pywal/pywal.kvconfig"
+    cp "$HOME/.cache/wal/pywal.svg" "$DOTFILES_PATH/Kvantum/.config/Kvantum/pywal/pywal.svg"
 
 
     echo "Updating Zed theme in dotfiles..."
