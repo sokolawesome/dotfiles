@@ -1,4 +1,4 @@
-include=/home/sokolawesome/.cache/wal/colors-mako
+include=~/.cache/wal/colors-mako
 
 sort=-time
 layer=overlay
