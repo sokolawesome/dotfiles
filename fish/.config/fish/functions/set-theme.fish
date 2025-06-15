@@ -1,4 +1,4 @@
-function set_theme -d "Apply a new theme based on a wallpaper"
+function set-theme -d "Apply a new theme based on a wallpaper"
     if not set -q argv[1]
         echo "Usage: set_theme /path/to/wallpaper.png"
         return 1

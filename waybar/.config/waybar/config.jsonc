@@ -1,7 +1,7 @@
 {
   "layer": "top",
   "position": "top",
-  "height": 35,
+  "height": 44,
   "spacing": 0,
   "modules-left": ["custom/menu", "hyprland/window"],
   "modules-center": ["hyprland/workspaces", "clock"],
@@ -101,6 +101,6 @@
   "custom/power": {
     "format": "󰐥",
     "tooltip": false,
-    "on-click": "wlogout -p",
+    "on-click": "~/.config/rofi/scripts/power-menu.sh",
   },
 }
