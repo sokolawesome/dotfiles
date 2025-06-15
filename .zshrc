@@ -22,7 +22,7 @@ autoload -Uz compinit
 compinit -d "$ZSH_COMPDUMP"
 
 # Theme & Plugins
-ZSH_THEME="agnoster"
+ZSH_THEME="gallois"
 
 zstyle ':omz:update' mode auto
 zstyle ':omz:update' frequency 7
@@ -45,3 +45,4 @@ eval "$(zoxide init zsh)"
 # Aliases
 alias ls="eza --icons"
 alias cat="bat"
+alias cd="z"
