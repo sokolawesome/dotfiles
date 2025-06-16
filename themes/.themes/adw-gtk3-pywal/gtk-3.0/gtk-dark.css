@@ -51,23 +51,6 @@
 @define-color dark_5 #000000;
 
 /* --- Remapped Colors --- */
-/* Use colors imported from wal */
-@define-color accent_bg_color @accent_bg_color;
-@define-color accent_fg_color @accent_fg_color;
-@define-color accent_color @accent_color;
-@define-color window_bg_color @window_bg_color;
-@define-color window_fg_color @window_fg_color;
-@define-color view_bg_color @view_bg_color;
-@define-color view_fg_color @view_fg_color;
-@define-color headerbar_bg_color @headerbar_bg_color;
-@define-color headerbar_fg_color @headerbar_fg_color;
-@define-color card_bg_color @card_bg_color;
-@define-color card_fg_color @card_fg_color;
-@define-color dialog_bg_color @dialog_bg_color;
-@define-color dialog_fg_color @dialog_fg_color;
-@define-color popover_bg_color @popover_bg_color;
-@define-color popover_fg_color @popover_fg_color;
-
 /* Add custom button color from wal file */
 @define-color button_bg_color #B45B3A;
 
