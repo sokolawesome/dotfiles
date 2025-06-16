@@ -13,6 +13,7 @@
 @define-color dialog_fg_color {color7};
 @define-color popover_bg_color {color0};
 @define-color popover_fg_color {color7};
+@define-color button_bg_color {color2};
 
 button {{
     background-color: {color2};

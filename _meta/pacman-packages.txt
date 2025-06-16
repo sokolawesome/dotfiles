@@ -15,6 +15,7 @@ dotnet-sdk
 dotnet-sdk-8.0
 efibootmgr
 eza
+firewalld
 fish
 fzf
 git
@@ -40,7 +41,7 @@ linux-zen-headers
 ly
 mako
 man-db
-nano
+micro
 network-manager-applet
 networkmanager
 nvidia-open-dkms
@@ -49,6 +50,7 @@ nwg-look
 otf-font-awesome
 pamixer
 papirus-icon-theme
+pavucontrol
 perl-image-exiftool
 pipewire
 pipewire-alsa
@@ -61,11 +63,11 @@ qt6-wayland
 qt6ct
 reflector
 rofi-wayland
-seahorse
 slurp
 smartmontools
 stow
 swappy
+tailscale
 telegram-desktop
 tree
 ttf-jetbrains-mono-nerd

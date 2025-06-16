@@ -21,16 +21,19 @@
   },
 
   "hyprland/workspaces": {
-    "format": "{icon}",
+    "on-scroll-up": "hyprctl dispatch workspace r-1",
+    "on-scroll-down": "hyprctl dispatch workspace r+1",
     "on-click": "activate",
+    "active-only": false,
     "all-outputs": true,
-    "sort-by-number": true,
+    "format": "{}",
     "format-icons": {
-      "1": "1",
-      "2": "2",
-      "3": "3",
-      "4": "4",
-      "5": "5",
+      "urgent": "",
+      "active": "",
+      "default": "",
+    },
+    "persistent-workspaces": {
+      "*": 5,
     },
   },
 
@@ -42,9 +45,9 @@
 
   "clock": {
     "interval": 1,
-    "format": " {:%H:%M}",
-    "format-alt": " {:%A, %B %d}",
-    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+    "format": " {:%H:%M:%S}",
+    "format-alt": " {:%H:%M   %Y, %d %B, %A}",
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "on-click-right": "notify-send ' Full Date' \"$(date '+%A, %B %d, %Y')\"",
   },
 
@@ -60,6 +63,7 @@
     "on-click": "pamixer -t",
     "on-scroll-up": "pamixer -i 5",
     "on-scroll-down": "pamixer -d 5",
+    "on-click-right": "pavucontrol",
   },
 
   "network": {
@@ -95,7 +99,7 @@
 
   "tray": {
     "icon-size": 20,
-    "spacing": 8,
+    "spacing": 10,
   },
 
   "custom/power": {
