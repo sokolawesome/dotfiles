@@ -1,0 +1,7 @@
+code2prompt
+omnisharp-roslyn
+outline-manager-appimage
+python-pywal16
+visual-studio-code-bin
+yay
+zen-browser-bin
