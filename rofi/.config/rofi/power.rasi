@@ -1,0 +1,14 @@
+@import "./config.rasi"
+
+window {
+    width:                        10em;
+    height:                       6em;
+}
+
+listview {
+    columns:                      1;
+}
+
+mainbox {
+    children:                     ["listview"];
+}

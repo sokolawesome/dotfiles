@@ -2,8 +2,8 @@ include=~/.cache/wal/colors-mako
 
 sort=-time
 layer=overlay
-width=300
-height=110
+width=700
+height=250
 padding=8
 border-size=2
 border-radius=0

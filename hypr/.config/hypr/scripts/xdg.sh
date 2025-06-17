@@ -23,7 +23,7 @@ sleep $_sleep1
 /usr/lib/xdg-desktop-portal-hyprland &
 sleep $_sleep3
 
-/usr/lib/xdg-desktop-portal-gtk
+/usr/lib/xdg-desktop-portal-gtk &
 sleep $_sleep1
 
 /usr/lib/xdg-desktop-portal &
