@@ -13,12 +13,6 @@ function set-theme -d "Apply a new theme based on a wallpaper"
         return 1
     end
 
-    # Check if DOTFILES_PATH is set
-    if not set -q DOTFILES_PATH
-        echo "Error: \$DOTFILES_PATH is not set"
-        return 1
-    end
-
     # Generate color scheme with pywal16
     echo "Generating color scheme from $wallpaper_path..."
     wal -i "$wallpaper_path" &> /dev/null
@@ -29,9 +23,9 @@ function set-theme -d "Apply a new theme based on a wallpaper"
 
     # Apply Kvantum theme
     echo "Applying Kvantum theme..."
-    mkdir -p "$DOTFILES_PATH/Kvantum/.config/Kvantum/pywal"
-    cp "$HOME/.cache/wal/pywal.kvconfig" "$DOTFILES_PATH/Kvantum/.config/Kvantum/pywal/pywal.kvconfig"
-    cp "$HOME/.cache/wal/pywal.svg" "$DOTFILES_PATH/Kvantum/.config/Kvantum/pywal/pywal.svg"
+    mkdir -p "$HOME/.config/Kvantum/pywal"
+    cp "$HOME/.cache/wal/pywal.kvconfig" "$HOME/.config/Kvantum/pywal/pywal.kvconfig"
+    cp "$HOME/.cache/wal/pywal.svg" "$HOME/.config/Kvantum/pywal/pywal.svg"
     or begin
         echo "Error: Failed to apply Kvantum theme"
         return 1
@@ -39,7 +33,7 @@ function set-theme -d "Apply a new theme based on a wallpaper"
 
     # Update Zed theme in dotfiles
     echo "Updating Zed theme in dotfiles..."
-    cp "$HOME/.cache/wal/colors-zed.json" "$DOTFILES_PATH/zed/.config/zed/themes/colors-zed.json"
+    cp "$HOME/.cache/wal/colors-zed.json" "$HOME/.config/zed/themes/colors-zed.json"
     or begin
         echo "Error: Failed to update Zed theme"
         return 1
