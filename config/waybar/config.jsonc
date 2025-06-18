@@ -3,8 +3,14 @@
   "position": "top",
   "height": 50,
   "spacing": 0,
-  "modules-left": ["custom/menu", "hyprland/window"],
-  "modules-center": ["hyprland/workspaces", "clock"],
+  "modules-left": [
+    "custom/menu",
+    "hyprland/window"
+  ],
+  "modules-center": [
+    "hyprland/workspaces",
+    "clock"
+  ],
   "modules-right": [
     "pulseaudio",
     "network",
@@ -13,13 +19,11 @@
     "tray",
     "custom/power",
   ],
-
   "custom/menu": {
     "format": "󰀻",
     "tooltip": false,
     "on-click": "rofi -show drun",
   },
-
   "hyprland/workspaces": {
     "on-scroll-up": "hyprctl dispatch workspace r-1",
     "on-scroll-down": "hyprctl dispatch workspace r+1",
@@ -36,13 +40,11 @@
       "*": 5,
     },
   },
-
   "hyprland/window": {
     "format": "{}",
     "max-length": 40,
     "separate-outputs": true,
   },
-
   "clock": {
     "interval": 1,
     "format": " {:%H:%M:%S}",
@@ -50,14 +52,17 @@
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "on-click-right": "notify-send ' Full Date' \"$(date '+%A, %B %d, %Y')\"",
   },
-
   "pulseaudio": {
     "format": "{icon} {volume}%",
     "format-muted": "󰖁 Muted",
     "format-icons": {
       "headphone": "󰋋",
       "headset": "󰋎",
-      "default": ["󰕿", "󰖀", "󰕾"],
+      "default": [
+        "󰕿",
+        "󰖀",
+        "󰕾"
+      ],
     },
     "scroll-step": 5,
     "on-click": "pamixer -t",
@@ -65,7 +70,6 @@
     "on-scroll-down": "pamixer -d 5",
     "on-click-right": "pavucontrol",
   },
-
   "network": {
     "interval": 5,
     "format-wifi": "󰤨 {essid}",
@@ -74,7 +78,6 @@
     "tooltip-format": "{ifname} via {gwaddr} \nIP: {ipaddr}\nDown: {bandwidthDownBytes}\nUp: {bandwidthUpBytes}",
     "on-click": "kitty -e nmtui",
   },
-
   "cpu": {
     "interval": 5,
     "format": "󰍛 {usage}%",
@@ -85,7 +88,6 @@
       "critical": 90,
     },
   },
-
   "memory": {
     "interval": 5,
     "format": "󰾆 {percentage}%",
@@ -96,12 +98,10 @@
       "critical": 90,
     },
   },
-
   "tray": {
     "icon-size": 20,
     "spacing": 10,
   },
-
   "custom/power": {
     "format": "󰐥",
     "tooltip": false,

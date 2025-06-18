@@ -2,6 +2,7 @@ code2prompt
 joplin-bin
 omnisharp-roslyn
 outline-manager-appimage
+python-haishoku
 python-pywal16
 visual-studio-code-bin
 yay
