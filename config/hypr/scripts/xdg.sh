@@ -1,3 +1,5 @@
+#!/bin/bash
+
 _sleep1="0.1"
 _sleep2="0.5"
 _sleep3="2"

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Options
 options="⏻ Shutdown\n⏼ Reboot\n Logout"
 

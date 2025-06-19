@@ -15,7 +15,7 @@ function set-theme -d "Apply a new theme based on a wallpaper"
 
     # Generate color scheme with pywal16
     echo "Generating color scheme from $wallpaper_path..."
-    wal -i "$wallpaper_path" &> /dev/null
+    wal -i "$wallpaper_path" --backend "haishoku" &> /dev/null
     or begin
         echo "Error: Failed to generate color scheme with wal"
         return 1
