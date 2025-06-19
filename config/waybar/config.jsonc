@@ -43,7 +43,6 @@
   "custom/media": {
     "exec": "~/.config/waybar/scripts/media.sh",
     "format": " {}",
-    "format-alt": " {}",
     "interval": 2,
     "on-click": "playerctl play-pause &",
     "on-scroll-up": "playerctl next &",
