@@ -1,5 +1,30 @@
 @import "./config.rasi"
 
+window {
+    width:                      50em;
+    height:                     40em;
+}
+
 listview {
-    columns:                      1;
+    columns:                    1;
+    lines:                      12;
+    fixed-height:               false;
+}
+
+element {
+    padding:                    12px;
+    spacing:                    0px;
+}
+
+element-text {
+    font:                       "JetBrainsMono Nerd Font 12";
+    margin:                     0px;
+}
+
+prompt {
+    str:                        "󰅇 ";
+}
+
+entry {
+    placeholder:                "search clipboard history...";
 }
