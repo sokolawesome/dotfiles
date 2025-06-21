@@ -3,8 +3,6 @@
 configuration {
     modi:                       "drun,run";
     display-drun:               "󰀻 Apps";
-    display-window:             "󰖯 Windows";
-    display-clipboard:          "󰅇 Clipboard";
     drun-display-format:        "{name}";
     window-format:              "{w} · {c} · {t}";
     show-icons:                 true;
@@ -13,8 +11,6 @@ configuration {
     icon-theme:                 "Papirus-Dark";
     font:                       "JetBrainsMono Nerd Font 14";
     scroll-method:              1;
-    kb-custom-1:                "Alt+d";
-    kb-custom-2:                "Alt+Delete";
 }
 
 * {
