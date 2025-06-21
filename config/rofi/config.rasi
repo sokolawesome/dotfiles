@@ -2,7 +2,7 @@
 
 configuration {
     modi:                       "drun,run";
-    display-drun:               "󰀻 Apps";
+    display-drun:               "󰣇 Apps";
     drun-display-format:        "{name}";
     window-format:              "{w} · {c} · {t}";
     show-icons:                 true;

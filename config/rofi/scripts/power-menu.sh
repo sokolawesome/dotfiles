@@ -1,20 +1,20 @@
 #!/bin/bash
 
 # Options
-options="⏻ Shutdown\n⏼ Reboot\n Logout"
+options=" Shutdown\n Reboot\n󰍃 Logout"
 
 # Get choice
 chosen=$(echo -e "$options" | rofi -dmenu -p "Power Menu" -i -config ~/.config/rofi/power.rasi)
 
 # Execute chosen command
 case "$chosen" in
-    "⏻ Shutdown")
+    " Shutdown")
         systemctl poweroff
         ;;
-    "⏼ Reboot")
+    " Reboot")
         systemctl reboot
         ;;
-    " Logout")
+    "󰍃 Logout")
         hyprctl dispatch exit
         ;;
 esac

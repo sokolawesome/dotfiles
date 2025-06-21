@@ -39,20 +39,6 @@ window#waybar {
     color: @color1;
 }
 
-#custom-menu,
-#custom-power {
-    background: @color1;
-    color: @background;
-    margin: 5px 5px;
-    padding: 0 10px;
-    min-width: 30px;
-}
-
-#custom-menu:hover,
-#custom-power:hover {
-    background: @color5;
-}
-
 #clock {
     color: @color6;
     font-weight: bold;

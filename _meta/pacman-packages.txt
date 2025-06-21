@@ -28,6 +28,7 @@ grim
 gst-plugin-pipewire
 hyprland
 hyprsunset
+jq
 kitty
 kvantum
 lazygit
@@ -82,6 +83,7 @@ wl-clipboard
 wlsunset
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
+xdg-user-dirs
 xdg-utils
 xorg-server
 xorg-xinit

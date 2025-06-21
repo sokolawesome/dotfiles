@@ -106,7 +106,7 @@ function set-theme -d "Apply a new theme based on a wallpaper"
     echo "Updating Telegram theme..."
     command walogram &> /dev/null
     and command killall Telegram &> /dev/null
-    hyprctl dispatch exec "Telegram"
+    hyprctl dispatch exec "Telegram" &> /dev/null
     if test $status -ne 0
         echo "Error: Failed to update Telegram theme"
         return 1
