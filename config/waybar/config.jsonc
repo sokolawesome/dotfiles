@@ -3,7 +3,7 @@
   "position": "top",
   "height": 50,
   "spacing": 0,
-  "modules-left": ["custom/menu", "custom/media", "hyprland/window"],
+  "modules-left": ["custom/menu", "custom/media"],
   "modules-center": ["hyprland/workspaces", "clock"],
   "modules-right": [
     "pulseaudio",
@@ -35,19 +35,14 @@
       "*": 5,
     },
   },
-  "hyprland/window": {
-    "format": "{}",
-    "max-length": 40,
-    "separate-outputs": true,
-  },
   "custom/media": {
     "exec": "~/.config/waybar/scripts/media.sh",
-    "format": " {}",
+    "format": " {text}",
     "interval": 2,
     "on-click-middle": "playerctl play-pause &",
     "on-click-right": "playerctl next &",
     "on-click-left": "playerctl previous &",
-    "max-length": 30,
+    "max-length": 40,
   },
   "clock": {
     "interval": 1,
@@ -79,7 +74,7 @@
   },
   "cpu": {
     "interval": 5,
-    "format": "󰻠 {usage}%",
+    "format": "󰻠 {load}%",
     "tooltip": true,
     "on-click": "kitty -e btop",
     "states": {
