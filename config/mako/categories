@@ -1,0 +1,7 @@
+[category=mpd]
+default-timeout=3000
+group-by=category
+
+[app-name="system"]
+default-timeout=0
+anchor=center

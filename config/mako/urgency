@@ -1,0 +1,14 @@
+[urgency=low]
+default-timeout=3000
+border-color=#cccccc
+
+[urgency=normal]
+default-timeout=5000
+
+[urgency=high]
+default-timeout=0
+border-color=#ff0000
+
+[urgency=critical]
+default-timeout=0
+border-color=#ff0000

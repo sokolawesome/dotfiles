@@ -1,0 +1,8 @@
+[app-name=firefox]
+default-timeout=4000
+
+[app-name=discord]
+default-timeout=6000
+
+[app-name=code]
+default-timeout=3000
