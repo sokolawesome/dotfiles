@@ -98,7 +98,7 @@ function set-theme -d "Apply a new theme based on a wallpaper"
     or return 1
 
     if set -q _flag_help
-        echo "Usage: set-theme [WALLPAPER] [-b|--backend wal|haishoku]"
+        echo "Usage: set-theme [WALLPAPER] [-b|--backend wal|haishoku|modern_colorthief]"
         return 0
     end
 
@@ -108,7 +108,7 @@ function set-theme -d "Apply a new theme based on a wallpaper"
 
     if set -q _flag_backend
         set backend $_flag_backend
-        if not contains $backend wal haishoku
+        if not contains $backend wal haishoku modern_colorthief
             echo "Error: Unsupported backend '$backend'. Use 'wal' or 'haishoku'."
             return 1
         end
@@ -142,7 +142,7 @@ function set-theme -d "Apply a new theme based on a wallpaper"
     end
 
     echo "Generating color scheme from $wallpaper_path using backend '$backend'..."
-    command wal -i "$wallpaper_path" --backend "$backend" --contrast 5 &> /dev/null
+    command wal -i "$wallpaper_path" --backend "$backend" --contrast 4.0 --saturate 0.7 &> /dev/null
     or begin
         echo "Error: Failed to generate color scheme with wal"
         return 1

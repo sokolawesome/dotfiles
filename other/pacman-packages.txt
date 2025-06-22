@@ -17,11 +17,13 @@ dotnet-sdk
 dotnet-sdk-8.0
 efibootmgr
 eza
+fd
 firewalld
 fish
 fisher
 fzf
 git
+git-delta
 gnome-keyring
 go
 grim
@@ -63,6 +65,8 @@ pipewire-alsa
 pipewire-jack
 pipewire-pulse
 polkit-kde-agent
+python-fast-colorthief
+python-modern-colorthief
 qt6-wayland
 qt6ct
 reflector
@@ -74,6 +78,7 @@ stow
 swappy
 swww
 tailscale
+tealdeer
 telegram-desktop
 tree
 ttf-jetbrains-mono-nerd
