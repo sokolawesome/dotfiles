@@ -51,6 +51,7 @@ nvidia-utils
 nvm
 nwg-look
 otf-font-awesome
+pacman-contrib
 pamixer
 papirus-icon-theme
 pavucontrol
