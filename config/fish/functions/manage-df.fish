@@ -30,21 +30,32 @@ function manage-df --description "Manage dotfiles using GNU Stow"
         set -l dry_run $argv[3]
 
         set -l stow_cmd "stow --no-folding"
-        set -l action "Stowing"
 
         if test "$restow" = true
             set stow_cmd "$stow_cmd -R"
-            set action "Restowing"
         else if test "$delete" = true
             set stow_cmd "$stow_cmd -D"
-            set action "Unstowing"
         else if test "$dry_run" = true
             set stow_cmd "$stow_cmd -n"
-            set action "Dry-run"
         end
 
         echo "$stow_cmd"
-        echo "$action"
+    end
+
+    function get_action_description
+        set -l restow $argv[1]
+        set -l delete $argv[2]
+        set -l dry_run $argv[3]
+
+        if test "$restow" = true
+            echo "Restowing"
+        else if test "$delete" = true
+            echo "Unstowing"
+        else if test "$dry_run" = true
+            echo "Dry-run"
+        else
+            echo "Stowing"
+        end
     end
 
     function get_target_directory
@@ -161,9 +172,8 @@ function manage-df --description "Manage dotfiles using GNU Stow"
         set dry_run true
     end
 
-    set -l stow_result (build_stow_command "$restow" "$delete" "$dry_run")
-    set -l stow_cmd (echo "$stow_result" | head -n1)
-    set -l action (echo "$stow_result" | tail -n1)
+    set -l stow_cmd (build_stow_command "$restow" "$delete" "$dry_run")
+    set -l action (get_action_description "$restow" "$delete" "$dry_run")
 
     if not safe_directory_change "$DOTFILES_PATH"
         return 1
