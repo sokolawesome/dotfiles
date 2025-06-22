@@ -17,13 +17,13 @@ function save-packages -d "Save explicitly installed pacman and AUR packages to 
     end
 
     function setup_directories
-        set -l meta_dir "$DOTFILES_PATH/_meta"
+        set -l other_dir "$DOTFILES_PATH/other"
 
-        if not test -d "$meta_dir"
-            echo "Creating _meta directory..."
-            mkdir -p "$meta_dir"
+        if not test -d "$other_dir"
+            echo "Creating 'other' directory..."
+            mkdir -p "$other_dir"
             or begin
-                echo "Error: Failed to create _meta directory"
+                echo "Error: Failed to create 'other' directory"
                 return 1
             end
         end
@@ -115,8 +115,8 @@ function save-packages -d "Save explicitly installed pacman and AUR packages to 
         return 1
     end
 
-    set -l pacman_file "$DOTFILES_PATH/_meta/pacman-packages.txt"
-    set -l aur_file "$DOTFILES_PATH/_meta/yay-packages.txt"
+    set -l pacman_file "$DOTFILES_PATH/other/pacman-packages.txt"
+    set -l aur_file "$DOTFILES_PATH/other/yay-packages.txt"
     set -l temp_all (mktemp)
     set -l temp_aur (mktemp)
 

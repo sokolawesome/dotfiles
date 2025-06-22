@@ -4,6 +4,7 @@ omnisharp-roslyn
 outline-manager-appimage
 python-haishoku
 python-pywal16
+python-pywalfox
 visual-studio-code-bin
 walogram-git
 yay

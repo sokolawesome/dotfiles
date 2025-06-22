@@ -170,6 +170,13 @@ function set-theme -d "Apply a new theme based on a wallpaper"
         return 1
     end
 
+    echo "Applying Zen theme..."
+    command pywalfox update
+    or begin
+        echo "Error: Failed to apply Zen theme"
+        return 1
+    end
+
     echo "Updating Telegram theme..."
     command walogram &> /dev/null
     and command killall Telegram &> /dev/null
