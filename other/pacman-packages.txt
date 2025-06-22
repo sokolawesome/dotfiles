@@ -29,6 +29,7 @@ gst-plugin-pipewire
 hyprland
 hyprsunset
 jq
+just
 kitty
 kvantum
 lazygit
@@ -44,6 +45,7 @@ ly
 mako
 man-db
 micro
+neovim
 network-manager-applet
 networkmanager
 nvidia-open-dkms
@@ -64,6 +66,7 @@ polkit-kde-agent
 qt6-wayland
 qt6ct
 reflector
+ripgrep
 rofi-wayland
 slurp
 smartmontools

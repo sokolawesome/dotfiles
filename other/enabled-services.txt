@@ -1,0 +1,29 @@
+# System services
+bluetooth.service
+firewalld.service
+getty@.service
+lm_sensors.service
+ly.service
+NetworkManager-dispatcher.service
+NetworkManager-wait-online.service
+NetworkManager.service
+nvidia-hibernate.service
+nvidia-resume.service
+nvidia-suspend.service
+sshd.service
+systemd-resolved.service
+systemd-timesyncd.service
+tailscaled.service
+systemd-userdbd.socket
+remote-fs.target
+fstrim.timer
+
+# User services
+pipewire-pulse.service
+ssh-agent.service
+wireplumber.service
+xdg-user-dirs-update.service
+gnome-keyring-daemon.socket
+p11-kit-server.socket
+pipewire-pulse.socket
+pipewire.socket

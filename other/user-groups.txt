@@ -1,0 +1,5 @@
+i2c
+input
+sokolawesome
+video
+wheel
