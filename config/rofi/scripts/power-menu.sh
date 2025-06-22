@@ -31,13 +31,13 @@ execute_action() {
     local chosen="$1"
 
     case "$chosen" in
-        " Shutdown")
+        " Shutdown")
             if confirm_action "Shutdown"; then
                 notify-send "System" "Shutting down..." -t 3000
                 systemctl poweroff
             fi
             ;;
-        " Reboot")
+        " Reboot")
             if confirm_action "Reboot"; then
                 notify-send "System" "Rebooting..." -t 3000
                 systemctl reboot
