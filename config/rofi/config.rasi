@@ -1,32 +1,43 @@
 @import "~/.cache/wal/colors-rofi-dark.rasi"
+@import "./variables.rasi"
 
 configuration {
-    modi:                       "drun,run";
+    modi:                       "drun,run,window,ssh,filebrowser";
     display-drun:               "󰣇 Apps";
-    drun-display-format:        "{name}";
+    display-run:                "󰅴 Run";
+    display-window:             "󰖲 Windows";
+    display-ssh:                "󰢹 SSH";
+    display-filebrowser:        "󰉋 Files";
+
+    drun-display-format:        "{name} [<span weight='light' size='small'><i>{generic}</i></span>]";
     window-format:              "{w} · {c} · {t}";
+
     show-icons:                 true;
+    icon-theme:                 "Papirus-Dark";
+
+    font:                       "JetBrainsMono Nerd Font 20";
+
     me-select-entry:            "";
     me-accept-entry:            "MousePrimary";
-    icon-theme:                 "Papirus-Dark";
-    font:                       "JetBrainsMono Nerd Font 14";
+
     scroll-method:              1;
+    auto-select:                false;
 }
 
 * {
-    background-alt:             rgba(0, 0, 0, 0.2);
-    border-color:               rgba(255, 255, 255, 0.15);
+    background-alt:             @transparency-light;
+    border-color:               @border-highlight;
     text-color:                 @foreground;
 }
 
 window {
-    width:                      30em;
+    width:                      35em;
     x-offset:                   0px;
     y-offset:                   0px;
     spacing:                    0px;
-    padding:                    10px;
+    padding:                    @padding-normal;
     margin:                     0px;
-    border:                     2px solid;
+    border:                     @border-width-thick;
     border-color:               @border-color;
     cursor:                     "default";
     transparency:               "real";
@@ -34,8 +45,8 @@ window {
     anchor:                     center;
     fullscreen:                 false;
     enabled:                    true;
-    border-radius:              12px;
-    background-color:           rgba(0, 0, 0, 0.85);
+    border-radius:              @border-radius-large;
+    background-color:           @transparency-medium;
 }
 
 listview {
@@ -43,77 +54,113 @@ listview {
     lines:                      10;
     fixed-height:               true;
     fixed-columns:              true;
-    cycle:                      false;
+    cycle:                      true;
     scrollbar:                  false;
-    border:                     0px solid;
-    border-radius:              8px;
+    border:                     0px;
+    border-radius:              @border-radius-normal;
     background-color:           @background-alt;
-    padding:                    4px;
+    padding:                    @padding-small;
 }
 
 prompt {
-    padding:                    0 8px 0 8px;
+    padding:                    0 4 0 4;
     background-color:           transparent;
     text-color:                 @foreground;
 }
 
 inputbar {
     children:                   ["prompt", "entry"];
-    spacing:                    2px;
-    border-radius:              8px;
-    padding:                    8px;
+    spacing:                    @spacing-small;
+    border-radius:              @border-radius-normal;
+    padding:                    @padding-normal;
     background-color:           @background-alt;
-    border:                     1px solid;
+    border:                     @border-width;
     border-color:               @border-color;
 }
 
 entry {
-    placeholder:                "find something ...";
+    placeholder:                "search...";
     padding:                    0px;
     background-color:           transparent;
     text-color:                 @foreground;
+    cursor:                     text;
 }
 
 mainbox {
-    spacing:                    8px;
+    spacing:                    @spacing-normal;
     margin:                     0;
     padding:                    0;
     children:                   ["inputbar", "listview", "message"];
 }
 
 element {
-    spacing:                    8px;
+    spacing:                    @spacing-normal;
     margin:                     2px;
-    padding:                    8px;
-    border:                     0px solid;
-    border-radius:              6px;
+    padding:                    @padding-normal;
+    border:                     0px;
+    border-radius:              @border-radius-small;
     background-color:           transparent;
+    cursor:                     pointer;
 }
 
 element normal.normal {
     background-color:           transparent;
 }
 
-element selected.active {
-    background-color:           @selected-normal-background;
-    text-color:                 @selected-normal-foreground;
-    border:                     1px solid;
-    border-color:               rgba(255, 255, 255, 0.3);
+element normal.urgent {
+    text-color:                 @urgent-foreground;
+    background-color:           @urgent-background;
+}
+
+element normal.active {
+    text-color:                 @active-foreground;
+    background-color:           @active-background;
 }
 
 element selected.normal {
     background-color:           @selected-normal-background;
     text-color:                 @selected-normal-foreground;
-    border:                     1px solid;
-    border-color:               rgba(255, 255, 255, 0.3);
+    border:                     @border-width;
+    border-color:               @border-selected;
+}
+
+element selected.urgent {
+    background-color:           @selected-urgent-background;
+    text-color:                 @selected-urgent-foreground;
+    border:                     @border-width;
+    border-color:               @border-selected;
+}
+
+element selected.active {
+    background-color:           @selected-active-background;
+    text-color:                 @selected-active-foreground;
+    border:                     @border-width;
+    border-color:               @border-selected;
 }
 
 element-icon {
     size:                       24px;
-    margin:                     0 8px 0 0;
+    margin:                     0 2 0 0;
+    cursor:                     inherit;
 }
 
 element-text {
     vertical-align:             0.5;
     text-color:                 inherit;
+    cursor:                     inherit;
+    markup:                     true;
+}
+
+message {
+    padding:                    @padding-normal;
+    border-radius:              @border-radius-normal;
+    background-color:           @background-alt;
+    border:                     @border-width;
+    border-color:               @border-color;
+}
+
+textbox {
+    text-color:                 @foreground;
+    padding:                    @padding-small;
+    background-color:           transparent;
 }

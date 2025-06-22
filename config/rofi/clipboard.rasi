@@ -2,12 +2,11 @@
 
 window {
     width:                      50em;
-    height:                     40em;
+    height:                     30em;
 }
 
 listview {
     columns:                    1;
-    lines:                      12;
     fixed-height:               false;
 }
 
@@ -17,12 +16,7 @@ element {
 }
 
 element-text {
-    font:                       "JetBrainsMono Nerd Font 12";
     margin:                     0px;
-}
-
-prompt {
-    str:                        "󰅇 ";
 }
 
 entry {

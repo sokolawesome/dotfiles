@@ -1,0 +1,21 @@
+* {
+    spacing-small:              6px;
+    spacing-normal:             10px;
+    spacing-large:              14px;
+
+    padding-small:              4px;
+    padding-normal:             6px;
+    padding-large:              8px;
+
+    border-radius-small:        6px;
+    border-radius-normal:       8px;
+    border-radius-large:        12px;
+
+    border-width:               1px;
+    border-width-thick:         2px;
+
+    transparency-light:         rgba(0, 0, 0, 0.2);
+    transparency-medium:        rgba(0, 0, 0, 0.85);
+    border-highlight:           rgba(255, 255, 255, 0.15);
+    border-selected:            rgba(255, 255, 255, 0.3);
+}
