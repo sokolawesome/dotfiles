@@ -2,7 +2,7 @@
 
 window {
     width:                        16em;
-    height:                       14em;
+    height:                       12em;
 }
 
 listview {

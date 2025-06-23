@@ -69,6 +69,7 @@ python-fast-colorthief
 python-modern-colorthief
 qt6-wayland
 qt6ct
+qutebrowser
 reflector
 ripgrep
 rofi-wayland

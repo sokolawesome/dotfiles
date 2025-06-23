@@ -5,6 +5,7 @@ outline-manager-appimage
 python-haishoku
 python-pywal16
 python-pywalfox
+ventoy-bin
 visual-studio-code-bin
 walogram-git
 yay

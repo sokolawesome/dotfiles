@@ -2,7 +2,7 @@
 
 * {
     font-family: JetBrainsMono Nerd Font;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
 }
 
@@ -27,15 +27,19 @@ window#waybar {
     background: @background;
     border: 3px solid @color12;
     border-radius: 10px;
-    margin: 2px;
-    padding: 0 15px;
+    margin: 5px 5px;
+    padding: 0px 10px;
     color: @foreground;
 }
 
 #workspaces button.active {
     color: @color0;
     background-color: @color12;
-    margin: 5px;
+}
+
+#workspaces button:hover {
+    background-color: @color9;
+    color: @foreground;
 }
 
 #workspaces button.urgent {

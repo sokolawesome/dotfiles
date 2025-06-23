@@ -1,6 +1,5 @@
 #!/bin/bash
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly CONFIG_DIR="$HOME/.config/rofi"
 
 check_dependencies() {
@@ -17,7 +16,6 @@ get_power_options() {
     echo " Shutdown"
     echo " Reboot"
     echo "󰍃 Logout"
-    echo "󰅠 Cancel"
 }
 
 confirm_action() {
@@ -33,24 +31,18 @@ execute_action() {
     case "$chosen" in
         " Shutdown")
             if confirm_action "Shutdown"; then
-                notify-send "System" "Shutting down..." -t 3000
                 systemctl poweroff
             fi
             ;;
         " Reboot")
             if confirm_action "Reboot"; then
-                notify-send "System" "Rebooting..." -t 3000
                 systemctl reboot
             fi
             ;;
         "󰍃 Logout")
             if confirm_action "Logout"; then
-                notify-send "System" "Logging out..." -t 3000
                 hyprctl dispatch exit
             fi
-            ;;
-        "󰅠 Cancel")
-            exit 0
             ;;
         *)
             exit 0
