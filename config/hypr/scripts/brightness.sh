@@ -1,18 +1,11 @@
 #!/bin/bash
 
 CHANGE="$1"
-BUS=$(ddcutil detect | awk '/I2C bus/ {print $3}' | sed 's|/dev/i2c-||' | head -n1)
 
-CURRENT=$(ddcutil getvcp 10 --bus=$BUS | awk -F'current value = |,' '{print $2}')
-MAX=$(ddcutil getvcp 10 --bus=$BUS | awk -F'max value = |,' '{print $3}')
+hyprctl hyprsunset gamma "$CHANGE"
 
-NEW=$((CURRENT + CHANGE))
+VALUE=$(hyprctl hyprsunset gamma)
 
-if [ "$NEW" -gt "$MAX" ]; then
-    NEW=$MAX
-elif [ "$NEW" -lt 0 ]; then
-    NEW=0
-fi
+VALUE=$(printf "%.0f" "$VALUE")
 
-ddcutil setvcp 10 "$NEW" --bus=$BUS
-notify-send "Brightness" "$NEW"
+notify-send -t 1000 -c "brightness" -h int:value:"$VALUE" "󰳲 $VALUE"

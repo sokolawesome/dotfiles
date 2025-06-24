@@ -6,3 +6,7 @@ default-timeout=6000
 
 [app-name=code]
 default-timeout=3000
+
+[app-name="system"]
+default-timeout=0
+anchor=center

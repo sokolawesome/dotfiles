@@ -20,7 +20,6 @@ markup=1
 actions=1
 default-timeout=5000
 ignore-timeout=0
-group-by=app-name
 
 on-button-left=dismiss
 on-button-middle=none

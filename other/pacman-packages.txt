@@ -6,6 +6,7 @@ aspnet-runtime-8.0
 base
 base-devel
 bat
+bc
 blueman
 bluez-utils
 btop
@@ -54,7 +55,6 @@ nvidia-open-dkms
 nvidia-utils
 nvm
 nwg-look
-otf-font-awesome
 pacman-contrib
 pamixer
 papirus-icon-theme

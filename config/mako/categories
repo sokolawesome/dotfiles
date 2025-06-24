@@ -2,6 +2,24 @@
 default-timeout=3000
 group-by=category
 
-[app-name="system"]
-default-timeout=0
+[category=brightness]
+layer=overlay
+history=0
 anchor=center
+group-by=category
+format=<b>%s</b>\n%b
+text-alignment=center
+
+[category=brightness group-index=0]
+invisible=0
+
+[category=volume]
+layer=overlay
+history=0
+anchor=center
+group-by=category
+format=<b>%s</b>\n%b
+text-alignment=center
+
+[category=volume group-index=0]
+invisible=0
