@@ -51,10 +51,12 @@ micro
 neovim
 network-manager-applet
 networkmanager
+noto-fonts-cjk
 nvidia-open-dkms
 nvidia-utils
 nvm
 nwg-look
+otf-font-awesome
 pacman-contrib
 pamixer
 papirus-icon-theme
@@ -75,6 +77,7 @@ ripgrep
 rofi-wayland
 slurp
 smartmontools
+steam
 stow
 swappy
 swww
