@@ -11,6 +11,7 @@
     "custom/temperature",
     "cpu",
     "memory",
+    "hyprland/language",
     "tray",
   ],
   "hyprland/workspaces": {
@@ -33,9 +34,9 @@
     "exec": "~/.config/waybar/scripts/media.sh",
     "format": " {text}",
     "interval": 2,
-    "on-click-middle": "playerctl play-pause &",
-    "on-click-right": "playerctl next &",
-    "on-click-left": "playerctl previous &",
+    "on-click-middle": "playerctl play-pause",
+    "on-click-right": "playerctl next",
+    "on-click-left": "playerctl previous",
     "max-length": 40,
   },
   "clock": {
@@ -46,7 +47,7 @@
   },
   "pulseaudio": {
     "format": "{icon} {volume}%",
-    "format-muted": " Muted",
+    "format-muted": "  Muted",
     "format-icons": {
       "headphone": "",
       "headset": "",
@@ -60,7 +61,7 @@
   },
   "network": {
     "interval": 5,
-    "format-wifi": " {essid}",
+    "format-wifi": "  {essid}",
     "format-ethernet": "󰈁 Wired",
     "format-disconnected": "󰈂 Disconnected",
     "tooltip-format": "↑ {bandwidthUpBytes} ↓ {bandwidthDownBytes}",
@@ -87,7 +88,7 @@
   },
   "memory": {
     "interval": 5,
-    "format": " {used:0.1f}G/{total:0.1f}G",
+    "format": "  {used:0.1f}G",
     "on-click": "kitty -e btop",
     "states": {
       "warning": 70,
@@ -97,5 +98,11 @@
   "tray": {
     "icon-size": 20,
     "spacing": 10,
+  },
+  "hyprland/language": {
+    "format": "{}",
+    "format-en": "EN",
+    "format-ru": "RU",
+    "keyboard-name": "by-tech-nuphy-halo65",
   },
 }

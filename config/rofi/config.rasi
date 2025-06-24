@@ -15,7 +15,7 @@ configuration {
     show-icons:                 true;
     icon-theme:                 "Papirus-Dark";
 
-    font:                       "JetBrainsMono Nerd Font 20";
+    font:                       "JetBrainsMono Nerd Font 16";
 
     me-select-entry:            "";
     me-accept-entry:            "MousePrimary";
