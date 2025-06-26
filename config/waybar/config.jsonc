@@ -37,21 +37,21 @@
         "on-click-middle": "playerctl play-pause",
         "on-click-right": "playerctl next",
         "on-click-left": "playerctl previous",
-        "max-length": 40,
+        "max-length": 47,
     },
 
     "clock": {
-        "format": "{:%d.%m.%Y | %H:%M}",
+        "format": "{:%H:%M | %d.%m.%Y}",
         "tooltip": false,
     },
 
     "pulseaudio": {
         "format": "VOL: {volume}%",
-        "format-muted": "VOL: 0%",
+        "format-muted": "VOL: MUT",
         "scroll-step": 5,
         "on-click": "pamixer -t",
-        "on-scroll-up": "pamixer -i 5 --allow-boost",
-        "on-scroll-down": "pamixer -d 5 --allow-boost",
+        "on-scroll-up": "pamixer -i 5 --allow-boost && ~/.config/hypr/scripts/volume.sh",
+        "on-scroll-down": "pamixer -d 5 --allow-boost && ~/.config/hypr/scripts/volume.sh",
         "on-click-right": "pavucontrol",
         "tooltip": false,
     },

@@ -22,16 +22,18 @@
 }
 
 #workspaces button {
-    color: @foreground;
-    margin: 0.2em;
-}
-
-#workspaces button.active {
-    background: alpha(@color1, 0.7);
+    box-shadow: none;
+    text-shadow: none;
+    background: none;
+    transition: none;
 }
 
 #workspaces button:hover {
-    background: alpha(@color1, 0.3);
+    color: alpha(@color2, 0.9);
+}
+
+#workspaces button.active {
+    color: @color4;
 }
 
 tooltip {
