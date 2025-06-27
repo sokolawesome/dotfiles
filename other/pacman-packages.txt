@@ -29,6 +29,7 @@ gnome-keyring
 go
 grim
 gst-plugin-pipewire
+gtk4-layer-shell
 hyprland
 hyprsunset
 jq
