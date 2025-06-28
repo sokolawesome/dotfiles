@@ -24,7 +24,8 @@
         "active-only": false,
         "format": "{id}",
         "persistent-workspaces": {
-            "*": 5,
+            "DP-6": 4,
+            "DP-5": 4,
         },
     },
 
