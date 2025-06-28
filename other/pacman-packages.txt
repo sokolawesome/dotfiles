@@ -30,7 +30,9 @@ go
 grim
 gst-plugin-pipewire
 gtk4-layer-shell
+hypridle
 hyprland
+hyprlock
 hyprsunset
 jq
 just
