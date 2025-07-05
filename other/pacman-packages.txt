@@ -1,5 +1,4 @@
 7zip
-adw-gtk-theme
 amd-ucode
 aspnet-runtime
 aspnet-runtime-8.0
@@ -12,7 +11,6 @@ bluez-utils
 btop
 cava
 cliphist
-ddcutil
 dkms
 dotnet-sdk
 dotnet-sdk-8.0
@@ -58,6 +56,7 @@ neovim
 network-manager-applet
 networkmanager
 noto-fonts-cjk
+noto-fonts-emoji
 nvidia-open-dkms
 nvidia-utils
 nvm
@@ -73,8 +72,6 @@ pipewire-alsa
 pipewire-jack
 pipewire-pulse
 polkit-kde-agent
-python-fast-colorthief
-python-modern-colorthief
 qt6-wayland
 qt6ct
 qutebrowser

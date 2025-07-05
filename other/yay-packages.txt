@@ -1,12 +1,10 @@
 code2prompt
 joplin-bin
 omnisharp-roslyn
-outline-manager-appimage
-python-haishoku
-python-pywal16
+rose-pine-cursor
+rose-pine-gtk-theme
+rose-pine-hyprcursor
 ventoy-bin
 visual-studio-code-bin
-walogram-git
-yandex-cloud-bin
 yay
 zen-browser-bin

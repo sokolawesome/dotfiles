@@ -1,52 +1,20 @@
 @import "./config.rasi"
 
 window {
-    width:                        12em;
-    height:                       9em;
+    width:                        8em;
+    height:                       6.5em;
 }
 
 listview {
     columns:                      1;
     lines:                        8;
     fixed-height:                 false;
-    spacing:                      4px;
 }
 
 mainbox {
     children:                     ["inputbar", "listview"];
-    spacing:                      8px;
 }
 
 inputbar {
     children:                     ["prompt"];
-    background-color:             @background-alt;
-    border:                       1px solid;
-    border-color:                 @border-color;
-    border-radius:                8px;
-    padding:                      8px;
-}
-
-prompt {
-    horizontal-align:             0.5;
-}
-
-element {
-    padding:                      12px 12px;
-    border-radius:                6px;
-    spacing:                      8px;
-}
-
-element selected.normal {
-    background-color:             @selected-normal-background;
-    text-color:                   @selected-normal-foreground;
-    border:                       @border-width;
-    border-color:                 rgba(255, 255, 255, 0.3);
-}
-
-element-text {
-    horizontal-align:             0.5;
-}
-
-textbox {
-    text-color:                   @foreground;
 }

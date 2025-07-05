@@ -10,15 +10,6 @@ listview {
     fixed-height:               false;
 }
 
-element {
-    padding:                    12px;
-    spacing:                    0px;
-}
-
-element-text {
-    margin:                     0px;
-}
-
 entry {
     placeholder:                "search clipboard history...";
 }

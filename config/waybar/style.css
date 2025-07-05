@@ -1,4 +1,21 @@
-@import "../../.cache/wal/colors-waybar.css";
+@define-color base            #232136;
+@define-color surface         #2a273f;
+@define-color overlay         #393552;
+
+@define-color muted           #6e6a86;
+@define-color subtle          #908caa;
+@define-color text            #e0def4;
+
+@define-color love            #eb6f92;
+@define-color gold            #f6c177;
+@define-color rose            #ea9a97;
+@define-color pine            #3e8fb0;
+@define-color foam            #9ccfd8;
+@define-color iris            #c4a7e7;
+
+@define-color highlightLow    #2a283e;
+@define-color highlightMed    #44415a;
+@define-color highlightHigh   #56526e;
 
 * {
     font-family: JetBrainsMono Nerd Font;
@@ -9,8 +26,8 @@
 }
 
 #waybar {
-    color: @foreground;
-    background-color: alpha(@background, 0.9);
+    color: @text;
+    background-color: alpha(@surface, 0.9);
 }
 
 #workspaces {
@@ -26,17 +43,18 @@
     text-shadow: none;
     background: none;
     transition: none;
+    border: none;
 }
 
 #workspaces button:hover {
-    color: alpha(@color2, 0.9);
+    color: alpha(@love, 0.9);
 }
 
 #workspaces button.active {
-    color: @color4;
+    color: @rose;
 }
 
 tooltip {
-    color: @foreground;
-    background-color: alpha(@background, 0.9);
+    color: @text;
+    background-color: alpha(@surface, 0.9);
 }

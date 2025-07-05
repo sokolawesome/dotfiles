@@ -4,9 +4,7 @@ if status is-login
     end
 end
 
-if test -f ~/.cache/wal/colors.fish
-    source ~/.cache/wal/colors.fish
-end
+fish_config theme choose "Rosé Pine Moon"
 
 set -g fish_greeting
 
