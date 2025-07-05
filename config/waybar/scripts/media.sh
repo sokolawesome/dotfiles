@@ -56,7 +56,7 @@ output_json() {
     local text="$1"
     local tooltip="$2"
 
-    local escaped_text=$(json_escape "$text")
+    local escaped_text=$(xml_escape "$(json_escape "$text")")
     local escaped_tooltip=$(xml_escape "$(json_escape "$tooltip")")
 
     echo "{\"text\": \"$escaped_text\", \"tooltip\": \"$escaped_tooltip\"}"

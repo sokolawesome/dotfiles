@@ -27,6 +27,7 @@ git
 git-delta
 gnome-keyring
 go
+golangci-lint
 grim
 gst-plugin-pipewire
 gtk4-layer-shell
@@ -51,6 +52,8 @@ ly
 mako
 man-db
 micro
+mpv
+mpv-mpris
 neovim
 network-manager-applet
 networkmanager
