@@ -85,7 +85,6 @@ stow
 swappy
 swww
 tailscale
-tealdeer
 telegram-desktop
 tree
 ttf-jetbrains-mono-nerd
@@ -95,7 +94,6 @@ wget
 wireplumber
 wl-clip-persist
 wl-clipboard
-wlsunset
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 xdg-user-dirs
