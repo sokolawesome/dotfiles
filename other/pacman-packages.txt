@@ -92,7 +92,6 @@ ttf-jetbrains-mono-nerd
 unzip
 waybar
 wget
-wireless_tools
 wireplumber
 wl-clip-persist
 wl-clipboard
