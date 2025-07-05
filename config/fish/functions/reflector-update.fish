@@ -17,21 +17,6 @@ function reflector-update -d "Update Pacman mirror list using reflector"
         end
     end
 
-    function validate_countries
-        set -l countries $argv
-
-        if test (count $countries) -eq 0
-            echo "Error: No countries specified."
-            return 1
-        end
-
-        for country in $countries
-            if not string match -qr '^[A-Z]{2}$' (string upper $country)
-                echo "Warning: '$country' may not be a valid ISO country code."
-            end
-        end
-    end
-
     function check_reflector_deps
         if not command -q reflector
             echo "Error: reflector is not installed. Install it with 'sudo pacman -S reflector'."
@@ -78,12 +63,12 @@ function reflector-update -d "Update Pacman mirror list using reflector"
     set -l mirrorlist "/etc/pacman.d/mirrorlist"
     set -l backup_file "/etc/pacman.d/mirrorlist.bak"
 
-    argparse 'c/country=' 'p/protocol=' 'n/number=' 'h/help' -- $argv
+    argparse 'c/country=+' 'p/protocol=' 'n/number=' 'h/help' -- $argv
     or return 1
 
     if set -q _flag_help
-        echo "Usage: reflector-update [-c|--country COUNTRIES] [-p|--protocol PROTOCOL] [-n|--number NUM]"
-        echo "  -c, --country    Comma-separated country codes (default: EE)"
+        echo "Usage: reflector-update [-c|--country COUNTRY...] [-p|--protocol PROTOCOL] [-n|--number NUM]"
+        echo "  -c, --country    Country names or codes (can be repeated, default: EE)"
         echo "  -p, --protocol   Protocol to use: http, https, ftp (default: https)"
         echo "  -n, --number     Number of mirrors (default: 20)"
         echo "  -h, --help       Show this help message"
@@ -96,7 +81,7 @@ function reflector-update -d "Update Pacman mirror list using reflector"
 
     set -l countries
     if set -q _flag_country
-        set countries (string split "," $_flag_country | string trim)
+        set countries $_flag_country
     else
         set countries $default_countries
     end
@@ -107,10 +92,6 @@ function reflector-update -d "Update Pacman mirror list using reflector"
 
     if set -q _flag_number
         set num_mirrors $_flag_number
-    end
-
-    if not validate_countries $countries
-        return 1
     end
 
     if not validate_protocol $protocol
@@ -125,13 +106,13 @@ function reflector-update -d "Update Pacman mirror list using reflector"
         return 1
     end
 
-    set -l country_args
-    for country in $countries
-        set -a country_args --country (string trim $country)
+    set -l country_args_for_reflector
+    for country_item in $countries
+        set -a country_args_for_reflector --country (string trim -- $country_item)
     end
 
     echo "Updating mirrorlist with $num_mirrors $protocol mirrors from "(string join ", " $countries)"..."
-    sudo reflector $country_args --protocol $protocol --latest $num_mirrors --sort rate --save $mirrorlist
+    sudo reflector $country_args_for_reflector --protocol $protocol --latest $num_mirrors --sort rate --save $mirrorlist
     or begin
         echo "Error: Failed to update mirrorlist."
         restore_mirrorlist $mirrorlist $backup_file
