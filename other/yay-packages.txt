@@ -6,5 +6,6 @@ rose-pine-gtk-theme
 rose-pine-hyprcursor
 ventoy-bin
 visual-studio-code-bin
+wlogout
 yay
 zen-browser-bin
