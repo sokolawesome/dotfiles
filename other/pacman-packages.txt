@@ -11,6 +11,7 @@ bluez-utils
 btop
 cava
 cliphist
+delve
 dkms
 dotnet-sdk
 dotnet-sdk-8.0
