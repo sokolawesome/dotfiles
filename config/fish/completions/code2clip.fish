@@ -30,24 +30,23 @@ function __fish_code2clip_exclude_patterns
 end
 
 complete -c code2clip \
-    -s h -l help \
-    -d "Show this help message"
+    -s h -l help -d "show this help message"
 
 complete -c code2clip \
     -s e -l exclude \
     -x \
-    -d "Regex pattern to exclude files/directories" \
+    -d "regex pattern to exclude files/directories" \
     -a "(__fish_code2clip_exclude_patterns)"
 
 complete -c code2clip \
     -s o -l output \
     -x \
-    -d "Output mode" \
+    -d "output mode" \
     -a "clipboard stdout"
 
 complete -c code2clip \
     -f \
-    -d "Directory to process" \
+    -d "dir to process" \
     -a "(__fish_code2clip_directories)"
 
 complete -c code2clip -k -f

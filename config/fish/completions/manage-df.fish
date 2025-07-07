@@ -1,12 +1,12 @@
 complete -r -c manage-df
 
 complete -c manage-df \
-    -s R -l restow -d "Restow packages (remove then stow)"
+    -s R -l restow -d "restow packages"
 complete -c manage-df \
-    -s D -l delete -d "Remove stowed packages"
+    -s D -l delete -d "remove stowed packages"
 complete -c manage-df \
-    -s n -l dry-run -d "Show what would be done without doing it"
+    -s n -l dry-run -d "dry run"
 complete -c manage-df \
-    -s h -l help -d "Show this help message"
+    -s h -l help -d "show this help message"
 
 complete -c manage-df -k -f

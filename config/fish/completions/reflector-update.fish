@@ -20,24 +20,24 @@ function __fish_reflector_numbers
 end
 
 complete -c reflector-update \
-    -s h -l help -d "Show this help message"
+    -s h -l help -d "show this help message"
 
 complete -c reflector-update \
     -s c -l country \
     -x \
-    -d "Country name or code" \
+    -d "country name/code" \
     -a "(__fish_reflector_countries_for_completion)"
 
 complete -c reflector-update \
     -s p -l protocol \
     -x \
-    -d "Protocol to use" \
+    -d "protocol to use" \
     -a "(__fish_reflector_protocols)"
 
 complete -c reflector-update \
     -s n -l number \
     -x \
-    -a "(__fish_reflector_numbers)" \
-    -d "Number of mirrors"
+    -d "number of mirrors" \
+    -a "(__fish_reflector_numbers)"
 
 complete -c reflector-update -k -f
