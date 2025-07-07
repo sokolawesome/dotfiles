@@ -1,52 +1,29 @@
-complete -c code2clip -e
+complete -r -c code2clip
 
-function __fish_code2clip_directories
-    find . -maxdepth 2 -type d -not -path '*/.*' 2>/dev/null | \
-        string replace -r '^\./' '' | \
-        string match -v '.'
-end
-
-function __fish_code2clip_exclude_patterns
-    printf '%s\n' \
-        '\.git/' \
-        'node_modules/' \
-        'dist/' \
-        '\.cache/' \
-        '\.next/' \
-        '__pycache__/' \
-        '\.idea/' \
-        '\.vscode/' \
-        '\.DS_Store' \
-        '\.log$' \
-        '\.tmp$' \
-        '\.lock$' \
-        '\.sum$' \
-        '\.svg$' \
-        '\.kvconfig$' \
-        'pywal\.json$' \
-        '\.code\.md$' \
-        '\.gitignore$' \
-        '\.golangci\.yml$'
+function code2clip-exclude-presets
+    printf '%s\n' web go rust dotnet
 end
 
 complete -c code2clip \
-    -s h -l help -d "show this help message"
+    -s h -l help \
+    -d "show this help message"
 
 complete -c code2clip \
     -s e -l exclude \
-    -x \
-    -d "regex pattern to exclude files/directories" \
-    -a "(__fish_code2clip_exclude_patterns)"
+    -x -d "regex or preset name" \
+    -a "(code2clip-exclude-presets)"
 
 complete -c code2clip \
     -s o -l output \
-    -x \
-    -d "output mode" \
+    -x -d "output mode" \
     -a "clipboard stdout"
 
 complete -c code2clip \
-    -f \
-    -d "dir to process" \
-    -a "(__fish_code2clip_directories)"
+    -s t -l no-tree \
+    -d "disable tree"
+
+complete -c code2clip \
+    -d "target directory" \
+    -a "(__fish_complete_directories)"
 
 complete -c code2clip -k -f

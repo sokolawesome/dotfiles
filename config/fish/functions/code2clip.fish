@@ -1,46 +1,72 @@
 function code2clip -d "generate content from directory and copy to clipboard"
     function validate-environment
-        if not command -q tree
-            echo "error: 'tree' command not found. install it with your package manager."
-            return 1
-        end
-
-        if not command -q find
-            echo "error: 'find' command not found."
-            return 1
-        end
-
-        if not command -q wl-copy
-            echo "error: 'wl-copy' command not found. install wl-clipboard package."
-            return 1
+        for cmd in tree find wl-copy
+            if not command -q $cmd
+                echo "error: '$cmd' not found, install it with your package manager."
+                return 1
+            end
         end
     end
 
     function validate-directory
-        set -l target_dir $argv[1]
-        if not test -d "$target_dir"
-            echo "error: directory '$target_dir' not found."
+        set -l dir $argv[1]
+        if not test -d "$dir"
+            echo "error: directory '$dir' not found."
             return 1
         end
     end
 
-    function build-exclude-pattern
-        set -l custom_exclude $argv[1]
-        set -l default_exclude '\.git/|node_modules/|dist/|\.cache/|\.next/|\.idea/|\.vscode/|\.DS_Store|__pycache__/|\.lock$|\.sum$|\.svg$|\.kvconfig$|pywal\.json$|\.code\.md$|\.gitignore$|\.golangci\.yml$|^\.git$'
+    function get-basic-exclude-pattern
+        echo '\.git/|\.DS_Store|\.idea/|\.vscode/|\.zed/|\.lock$|\.svg$|\.gitignore$'
+    end
 
-        if test -n "$custom_exclude"
-            echo "$custom_exclude"
+    function get-preset-exclude-pattern
+        set -l preset $argv[1]
+
+        switch $preset
+            case web
+                echo 'node_modules/|dist/|build/|\.cache/|\.next/|\.nuxt/|coverage/|\.nyc_output/|\.parcel-cache/'
+            case go
+                echo 'bin/|pkg/|vendor/|go\.mod$|go\.sum$|\.test$'
+            case rust
+                echo 'target/|Cargo\.lock$|\.cargo/'
+            case dotnet
+                echo 'bin/|obj/|\.vs/|packages/|\.nuget/|TestResults/|\.user$|\.suo$'
+            case '*'
+                echo ""
+        end
+    end
+
+    function build-exclude-pattern
+        set -l preset_or_custom $argv[1]
+        set -l basic_pattern (get-basic-exclude-pattern)
+
+        if test -z "$preset_or_custom"
+            echo "$basic_pattern"
         else
-            echo "$default_exclude"
+            set -l preset_pattern (get-preset-exclude-pattern "$preset_or_custom")
+
+            if test -z "$preset_pattern"
+                echo "$basic_pattern|$preset_or_custom"
+            else
+                echo "$basic_pattern|$preset_pattern"
+            end
         end
     end
 
     function generate-tree-structure
-        set -l target_dir $argv[1]
-        set -l exclude_pattern $argv[2]
-
+        set -l dir $argv[1]
+        set -l exclude $argv[2]
         echo "## directory structure"
-        tree -a -I "$exclude_pattern" --noreport -L 3 "$target_dir" || return 1
+
+        if test -f "$dir/.gitignore"
+            set -l gitignore_patterns (cat "$dir/.gitignore" | grep -v '^#' | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
+            if test -n "$gitignore_patterns"
+                set exclude "$exclude|$gitignore_patterns"
+            end
+        end
+
+        tree -a -I "$exclude" --noreport -L 3 "$dir" || return 1
     end
 
     function print-file-content
@@ -49,55 +75,55 @@ function code2clip -d "generate content from directory and copy to clipboard"
 
         echo ""
         echo "### '$file'"
-        if test -n "$ext"
-            echo "```$ext"
-        else
-            echo "```"
-        end
+        echo "```$ext"
         cat "$file"
         echo "```"
         echo ""
     end
 
     function generate-file-contents
-        set -l target_dir $argv[1]
-        set -l exclude_pattern $argv[2]
+        set -l dir $argv[1]
+        set -l exclude $argv[2]
 
         echo ""
         echo "## file contents"
 
-        find "$target_dir" -type f -print0 | \
-            grep -vzE "$exclude_pattern" | \
-            while read -z file
-                if test -f "$file" -a -r "$file"
-                    if test -f "$target_dir/.gitignore"
-                        git -C "$target_dir" check-ignore "$file" > /dev/null 2>&1
-                        and continue
+        find "$dir" -type f -print0 | grep -vzE "$exclude" | while read -z file
+            if test -f "$file" -a -r "$file"
+                if test -f "$dir/.gitignore"
+                    if git -C "$dir" check-ignore "$file" > /dev/null 2>&1
+                        continue
                     end
-
-                    grep -Iq . "$file" || continue
-                    print-file-content "$file"
                 end
+
+                grep -Iq . "$file" || continue
+                print-file-content "$file"
             end
+        end
     end
 
     function generate-content
-        set -l target_dir $argv[1]
-        set -l exclude_pattern $argv[2]
+        set -l dir $argv[1]
+        set -l exclude $argv[2]
+        set -l show_tree $argv[3]
 
-        generate-tree-structure "$target_dir" "$exclude_pattern" || return 1
-        generate-file-contents "$target_dir" "$exclude_pattern" || return 1
+        if test "$show_tree" = true
+            generate-tree-structure "$dir" "$exclude" || return 1
+        end
+
+        generate-file-contents "$dir" "$exclude" || return 1
     end
 
     function output-content
         set -l content $argv[1]
-        set -l output_mode $argv[2]
+        set -l mode $argv[2]
 
-        if test "$output_mode" = "stdout"
+        if test "$mode" = "stdout"
             echo "$content"
         else
-            echo "$content" | wl-copy || begin
-                echo "error: failed to copy to clipboard. is 'wl-copy' working correctly?"
+            echo "$content" | wl-copy
+            or begin
+                echo "error: failed to copy to clipboard"
                 return 1
             end
             echo "content successfully copied to clipboard!"
@@ -108,48 +134,48 @@ function code2clip -d "generate content from directory and copy to clipboard"
         return 1
     end
 
-    argparse 'e/exclude=' 'h/help' 'o/output=' -- $argv || return 1
+    argparse 'e/exclude=' 'o/output=' 'h/help' 't/no-tree' -- $argv || return 1
 
     if set -q _flag_help
         echo "usage: code2clip [OPTIONS] <DIRECTORY>"
         echo "generate content from directory and copy to clipboard or stdout."
         echo ""
         echo "options:"
-        echo "  -e, --exclude <PATTERN>   regex pattern to exclude files/directories"
-        echo "                            (overrides default exclusions)"
-        echo "  -o, --output <MODE>       output mode: clipboard (default) or stdout"
-        echo "  -h, --help                show this help message"
+        echo "  -e, --exclude <NAME|REGEX>   exclude pattern or preset"
+        echo "                               presets: web, go, rust, dotnet"
+        echo "  -o, --output <MODE>          output mode: clipboard (default) or stdout"
+        echo "  -t, --no-tree                do not include dir tree structure"
+        echo "  -h, --help                   show this help message"
         echo ""
         echo "arguments:"
-        echo "  DIRECTORY                 directory to process (required)"
+        echo "  DIRECTORY                    directory to process (required)"
         return 0
     end
 
     if test (count $argv) -eq 0
-        echo "error: directory argument is required."
-        echo "use 'code2clip --help' for usage information."
+        echo "error: missing directory argument"
         return 1
     end
 
-    set -l target_dir (realpath "$argv[1]")
-    set -l exclude_pattern (build-exclude-pattern "$_flag_exclude")
+    set -l dir (realpath "$argv[1]")
+    if not validate-directory "$dir"
+        return 1
+    end
+
+    set -l exclude (build-exclude-pattern "$_flag_exclude")
     set -l output_mode "clipboard"
-
-    if test -n "$_flag_output"
-        set output_mode "$_flag_output"
+    if set -q _flag_output
+        set output_mode $_flag_output
     end
 
-    if not validate-directory "$target_dir"
-        return 1
+    set -l show_tree true
+    if set -q _flag_no_tree
+        set show_tree false
     end
 
-    echo "generating content from "(basename "$target_dir")" directory..."
-
-    set -l content (generate-content "$target_dir" "$exclude_pattern" | string collect)
-    if test $status -ne 0
-        echo "error: content generation failed."
-        return 1
-    end
+    echo "generating content from "(basename "$dir")"..."
+    set -l content (generate-content "$dir" "$exclude" "$show_tree" | string collect)
+    or return 1
 
     output-content "$content" "$output_mode"
 end

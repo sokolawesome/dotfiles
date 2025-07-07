@@ -1,43 +1,39 @@
 complete -r -c reflector-update
 
-function __fish_reflector_countries_for_completion
-    if not command -q reflector
-        return 1
+function reflector-countries
+    if command -q reflector
+        reflector --list-countries 2>/dev/null | \
+            string match -r '^([A-Za-z\s\(\)\/]+?)\s{2,}' | \
+            string replace -r '\s{2,}.*$' '' | \
+            string trim
     end
-
-    reflector --list-countries 2>/dev/null | \
-        string match -r '^([A-Za-z\s\(\)\/]+?)\s{2,}' | \
-        string replace -r '\s{2,}.*$' '' | \
-        string trim
 end
 
-function __fish_reflector_protocols
+function reflector-protocols
     printf '%s\n' http https ftp
 end
 
-function __fish_reflector_numbers
+function reflector-numbers
     printf '%s\n' 5 10 15 20 25 30
 end
 
 complete -c reflector-update \
-    -s h -l help -d "show this help message"
+    -s h -l help \
+    -d "show this help message"
 
 complete -c reflector-update \
     -s c -l country \
-    -x \
-    -d "country name/code" \
-    -a "(__fish_reflector_countries_for_completion)"
+    -x -d "country name/code" \
+    -a "(reflector-countries)"
 
 complete -c reflector-update \
     -s p -l protocol \
-    -x \
-    -d "protocol to use" \
-    -a "(__fish_reflector_protocols)"
+    -x -d "protocol to use" \
+    -a "(reflector-protocols)"
 
 complete -c reflector-update \
     -s n -l number \
-    -x \
-    -d "number of mirrors" \
-    -a "(__fish_reflector_numbers)"
+    -x -d "number of mirrors" \
+    -a "(reflector-numbers)"
 
 complete -c reflector-update -k -f
