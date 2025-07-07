@@ -58,9 +58,9 @@ network-manager-applet
 networkmanager
 noto-fonts-cjk
 noto-fonts-emoji
+npm
 nvidia-open-dkms
 nvidia-utils
-nvm
 nwg-look
 otf-font-awesome
 pacman-contrib

@@ -1,4 +1,3 @@
-code2prompt
 joplin-bin
 omnisharp-roslyn
 rose-pine-cursor

@@ -2,6 +2,7 @@ return {
     'williamboman/mason.nvim',
     dependencies = {
         'williamboman/mason-lspconfig.nvim',
+        "WhoIsSethDaniel/mason-tool-installer.nvim",
         'neovim/nvim-lspconfig',
     },
     config = function()
@@ -10,19 +11,24 @@ return {
         local lspconfig = require('lspconfig')
         local lsp_defaults = require('plugins.lsp')
         local capabilities = require('cmp_nvim_lsp').default_capabilities()
+        local mason_tool_installer = require("mason-tool-installer")
 
         mason.setup()
 
         mason_lspconfig.setup({
             ensure_installed = {
                 'gopls',
-                -- 'rust_analyzer',
-                -- 'tsserver',
-                -- 'csharp_ls',
-                -- 'html',
-                -- 'cssls',
-                -- 'yamlls',
-                -- 'jsonls',
+                'rust_analyzer',
+                'tsserver',
+                'csharp_ls',
+                'html',
+                'cssls',
+                'yamlls',
+                'jsonls',
+                'just',
+                'lua_ls',
+                'bashls',
+                'fish_lsp',
             },
             handlers = {
                 function(server_name)
@@ -46,6 +52,20 @@ return {
                         },
                     })
                 end,
+            },
+        })
+
+        mason_tool_installer.setup({
+            ensure_installed = {
+                'golangci-lint',
+                'csharpier',
+                'yamllint',
+                'jsonlint',
+                'prettier',
+                'stylua',
+                'shfmt',
+                'shellcheck',
+                "eslint_d",
             },
         })
     end,

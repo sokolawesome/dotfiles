@@ -1,6 +1,6 @@
 return {
     'stevearc/conform.nvim',
-    event = { 'BufWritePre' },
+    event = { 'BufWritePre', 'BufNewFile', 'BufReadPre' },
     cmd = { 'ConformInfo' },
     config = function()
         local conform = require('conform')
@@ -10,22 +10,25 @@ return {
                 lua = { 'stylua' },
                 go = { 'gofmt', 'goimports' },
                 rust = { 'rustfmt' },
+                csharp = { 'csharpier' },
+                bash = { 'shfmt' },
+
                 javascript = { 'prettier' },
                 typescript = { 'prettier' },
-                csharp = { 'csharpier' },
                 json = { 'prettier' },
                 yaml = { 'prettier' },
                 html = { 'prettier' },
                 css = { 'prettier' },
             },
             format_on_save = {
-                timeout_ms = 500,
+                async = false,
+                timeout_ms = 1000,
                 lsp_fallback = true,
             },
         })
 
         vim.keymap.set({ 'n', 'v' }, '<leader>cf', function()
-            conform.format({ async = true, lsp_fallback = true })
+            conform.format({ async = false, timeout_ms = 1000, lsp_fallback = true })
         end, { desc = 'Format file' })
     end,
 }
