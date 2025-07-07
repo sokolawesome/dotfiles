@@ -1,4 +1,4 @@
-# System services
+# system services
 bluetooth.service
 firewalld.service
 getty@.service
@@ -18,7 +18,7 @@ systemd-userdbd.socket
 remote-fs.target
 fstrim.timer
 
-# User services
+# user services
 pipewire-pulse.service
 ssh-agent.service
 wireplumber.service

@@ -1,60 +1,73 @@
-function reflector-update -d "Update Pacman mirror list using reflector"
-    function validate_protocol
+function reflector-update -d "update pacman mirror list using reflector"
+    function validate-args
         set -l protocol $argv[1]
+        set -l num_mirrors $argv[2]
 
         if not contains $protocol http https ftp
-            echo "Error: Invalid protocol '$protocol'. Use http, https, or ftp."
+            echo "error: invalid protocol '$protocol'. use http, https, or ftp."
             return 1
         end
-    end
-
-    function validate_number
-        set -l num_mirrors $argv[1]
 
         if not string match -qr '^\d+$' $num_mirrors; or test $num_mirrors -le 0
-            echo "Error: Number of mirrors must be a positive integer."
+            echo "error: number of mirrors must be a positive integer."
             return 1
         end
     end
 
-    function check_reflector_deps
+    function check-dependencies
         if not command -q reflector
-            echo "Error: reflector is not installed. Install it with 'sudo pacman -S reflector'."
+            echo "error: reflector is not installed. install it with 'sudo pacman -S reflector'."
             return 1
         end
 
         if not command -q sudo
-            echo "Error: sudo is required but not available."
+            echo "error: ensure sudo is installed and configured."
             return 1
         end
     end
 
-    function backup_mirrorlist
+    function backup-mirrorlist
         set -l mirrorlist $argv[1]
         set -l backup_file $argv[2]
 
         if test -f $mirrorlist
-            echo "Backing up $mirrorlist to $backup_file..."
-            sudo cp $mirrorlist $backup_file
-            or begin
-                echo "Error: Failed to backup mirrorlist."
-                return 1
-            end
+            echo "backing up $mirrorlist to $backup_file..."
+            sudo cp $mirrorlist $backup_file || return 1
         end
     end
 
-    function restore_mirrorlist
+    function restore-mirrorlist
         set -l mirrorlist $argv[1]
         set -l backup_file $argv[2]
 
         if test -f $backup_file
-            echo "Restoring backup mirrorlist..."
-            sudo cp $backup_file $mirrorlist
-            or begin
-                echo "Error: Failed to restore mirrorlist backup."
-                return 1
-            end
+            echo "restoring backup mirrorlist..."
+            sudo cp $backup_file $mirrorlist || return 1
         end
+    end
+
+    function update-mirrors
+        set -l countries $argv[1..-4]
+        set -l protocol $argv[-3]
+        set -l num_mirrors $argv[-2]
+        set -l mirrorlist $argv[-1]
+
+        set -l country_args
+        for country in $countries
+            set -a country_args --country (string trim $country)
+        end
+
+        echo "updating mirrorlist with $num_mirrors $protocol mirrors from "(string join ", " $countries)"..."
+        sudo reflector $country_args --protocol $protocol --latest $num_mirrors --sort rate --save $mirrorlist || return 1
+
+        if not test -s $mirrorlist
+            echo "error: mirrorlist is empty or not updated."
+            return 1
+        end
+    end
+
+    if not check-dependencies
+        return 1
     end
 
     set -l default_countries "EE"
@@ -63,27 +76,20 @@ function reflector-update -d "Update Pacman mirror list using reflector"
     set -l mirrorlist "/etc/pacman.d/mirrorlist"
     set -l backup_file "/etc/pacman.d/mirrorlist.bak"
 
-    argparse 'c/country=+' 'p/protocol=' 'n/number=' 'h/help' -- $argv
-    or return 1
+    argparse 'c/country=+' 'p/protocol=' 'n/number=' 'h/help' -- $argv || return 1
 
     if set -q _flag_help
-        echo "Usage: reflector-update [-c|--country COUNTRY...] [-p|--protocol PROTOCOL] [-n|--number NUM]"
-        echo "  -c, --country    Country names or codes (can be repeated, default: EE)"
-        echo "  -p, --protocol   Protocol to use: http, https, ftp (default: https)"
-        echo "  -n, --number     Number of mirrors (default: 20)"
-        echo "  -h, --help       Show this help message"
+        echo "usage: reflector-update [-c|--country COUNTRY...] [-p|--protocol PROTOCOL] [-n|--number NUM]"
+        echo "  -c, --country    country names or codes (can be repeated, default: EE)"
+        echo "  -p, --protocol   protocol to use: http, https, ftp (default: https)"
+        echo "  -n, --number     number of mirrors (default: 20)"
+        echo "  -h, --help       show this help message"
         return 0
     end
 
-    if not check_reflector_deps
-        return 1
-    end
-
-    set -l countries
+    set -l countries $default_countries
     if set -q _flag_country
         set countries $_flag_country
-    else
-        set countries $default_countries
     end
 
     if set -q _flag_protocol
@@ -94,45 +100,26 @@ function reflector-update -d "Update Pacman mirror list using reflector"
         set num_mirrors $_flag_number
     end
 
-    if not validate_protocol $protocol
+    if not validate-args $protocol $num_mirrors
         return 1
     end
 
-    if not validate_number $num_mirrors
+    if not backup-mirrorlist $mirrorlist $backup_file
         return 1
     end
 
-    if not backup_mirrorlist $mirrorlist $backup_file
+    if not update-mirrors $countries $protocol $num_mirrors $mirrorlist
+        restore-mirrorlist $mirrorlist $backup_file
         return 1
     end
 
-    set -l country_args_for_reflector
-    for country_item in $countries
-        set -a country_args_for_reflector --country (string trim -- $country_item)
-    end
+    echo "mirrorlist updated successfully!"
 
-    echo "Updating mirrorlist with $num_mirrors $protocol mirrors from "(string join ", " $countries)"..."
-    sudo reflector $country_args_for_reflector --protocol $protocol --latest $num_mirrors --sort rate --save $mirrorlist
-    or begin
-        echo "Error: Failed to update mirrorlist."
-        restore_mirrorlist $mirrorlist $backup_file
+    echo "syncing pacman databases..."
+    sudo pacman -Syy || begin
+        echo "error: failed to sync pacman databases."
         return 1
     end
 
-    if not test -s $mirrorlist
-        echo "Error: Mirrorlist is empty or not updated."
-        restore_mirrorlist $mirrorlist $backup_file
-        return 1
-    end
-
-    echo "Mirrorlist updated successfully!"
-
-    echo "Syncing pacman databases..."
-    sudo pacman -Syy
-    or begin
-        echo "Error: Failed to sync pacman databases."
-        return 1
-    end
-
-    echo "Reflector update complete!"
+    echo "reflector update complete!"
 end

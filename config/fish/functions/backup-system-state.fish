@@ -1,206 +1,151 @@
-function backup-system-state -d "Save explicitly installed pacman and AUR packages, user groups, and services to separate files in dotfiles directory"
-    function validate_environment
+function backup-system-state -d "save explicitly installed pacman and aur packages, user groups, and services to separate files in dotfiles directory"
+    function validate-environment
         if not set -q DOTFILES_PATH
-            echo "Error: \$DOTFILES_PATH is not set"
+            echo "error: \$DOTFILES_PATH is not set"
             return 1
         end
 
         if not test -d "$DOTFILES_PATH"
-            echo "Error: Dotfiles directory '$DOTFILES_PATH' does not exist"
+            echo "error: dotfiles directory '$DOTFILES_PATH' does not exist"
             return 1
         end
 
         if not command -q pacman
-            echo "Error: pacman is not installed or not in PATH"
+            echo "error: pacman is not installed or not in path"
             return 1
         end
     end
 
-    function setup_directories
+    function setup-directories
         set -l other_dir "$DOTFILES_PATH/other"
 
         if not test -d "$other_dir"
             echo "creating 'other' directory..."
-            mkdir -p "$other_dir"
-            or begin
-                echo "error: failed to create 'other' directory"
+            mkdir -p "$other_dir" || return 1
+        end
+    end
+
+    function get-packages
+        set -l output_file $argv[1]
+        set -l package_type $argv[2]
+
+        switch $package_type
+            case all
+                pacman -Qe | awk '{print $1}' > "$output_file"
+            case aur
+                pacman -Qem | awk '{print $1}' > "$output_file"
+            case '*'
                 return 1
-            end
         end
     end
 
-    function cleanup_temp
-        set -l temp_files $argv
-        rm -f $temp_files
-    end
-
-    function get_all_packages
-        set -l temp_file $argv[1]
-
-        echo "collecting explicitly installed packages..."
-        pacman -Qe | awk '{print $1}' > "$temp_file"
-        or begin
-            echo "error: failed to list explicitly installed packages"
-            return 1
-        end
-    end
-
-    function get_aur_packages
-        set -l temp_file $argv[1]
-
-        echo "collecting explicitly installed AUR packages..."
-        pacman -Qem | awk '{print $1}' > "$temp_file"
-        or begin
-            echo "error: failed to list AUR packages"
-            return 1
-        end
-    end
-
-    function get_user_groups
+    function get-user-groups
         set -l groups_file $argv[1]
-
-        echo "collecting user groups..."
         groups | tr ' ' '\n' | sort > "$groups_file"
-        or begin
-            echo "error: failed to save user groups"
-            return 1
-        end
     end
 
-    function get_enabled_services
+    function get-enabled-services
         set -l services_file $argv[1]
 
-        echo "collecting enabled systemd services..."
         begin
-            echo "# System services"
+            echo "# system services"
             systemctl list-unit-files --state=enabled --no-pager --no-legend | awk '{print $1}' | grep -v "^\$"
             echo ""
-            echo "# User services"
+            echo "# user services"
             systemctl --user list-unit-files --state=enabled --no-pager --no-legend 2>/dev/null | awk '{print $1}' | grep -v "^\$"
         end > "$services_file"
-        or begin
-            echo "error: failed to save systemd services"
-            return 1
-        end
     end
 
-    function compare_and_save_file
+    function compare-and-update
         set -l temp_file $argv[1]
         set -l target_file $argv[2]
         set -l description $argv[3]
-        set -l changed_var_name $argv[4]
 
         if test -f "$target_file"
             if cmp -s "$temp_file" "$target_file"
-                # No change, do nothing
-                set -g $changed_var_name 0
+                return 1
             else
                 echo "updating $description..."
-                cp "$temp_file" "$target_file"
-                or begin
-                    echo "error: failed to write $target_file"
-                    return 1
-                end
-                set -g $changed_var_name 1
+                cp "$temp_file" "$target_file" || return 2
             end
         else
             echo "creating $description file '$target_file'..."
-            cp "$temp_file" "$target_file"
-            or begin
-                echo "error: failed to write $target_file"
-                return 1
-            end
-            set -g $changed_var_name 1
+            cp "$temp_file" "$target_file" || return 2
         end
         return 0
     end
 
-    function save_package_files
+    function save-package-files
         set -l temp_all $argv[1]
         set -l temp_aur $argv[2]
         set -l pacman_file $argv[3]
         set -l aur_file $argv[4]
-        set -l pacman_changed_var $argv[5]
-        set -l aur_changed_var $argv[6]
 
-        set -g $aur_changed_var 0
-        set -g $pacman_changed_var 0
+        set -l changed_files 0
 
-        # Save AUR packages
-        if not compare_and_save_file "$temp_aur" "$aur_file" "AUR packages" $aur_changed_var
-            return 1
+        if compare-and-update "$temp_aur" "$aur_file" "aur packages"
+            set -l status $status
+            if test $status -eq 0
+                set changed_files (math $changed_files + 1)
+            else if test $status -eq 2
+                return 1
+            end
         end
 
-        # Determine official pacman packages
-        set -l temp_pacman_filtered (mktemp)
+        set -l temp_pacman (mktemp)
         if test -s "$temp_aur"
-            grep -Fxv -f "$temp_aur" "$temp_all" > "$temp_pacman_filtered"
-            or begin
-                echo "error: failed to filter official packages"
-                cleanup_temp "$temp_pacman_filtered"
-                return 1
-            end
+            grep -Fxv -f "$temp_aur" "$temp_all" > "$temp_pacman" || return 1
         else
-            cp "$temp_all" "$temp_pacman_filtered"
-            or begin
-                echo "error: failed to copy all packages for official calculation"
-                cleanup_temp "$temp_pacman_filtered"
+            cp "$temp_all" "$temp_pacman" || return 1
+        end
+
+        if compare-and-update "$temp_pacman" "$pacman_file" "official pacman packages"
+            set -l status $status
+            if test $status -eq 0
+                set changed_files (math $changed_files + 1)
+            else if test $status -eq 2
+                rm -f "$temp_pacman"
                 return 1
             end
         end
 
-        # Save official pacman packages
-        if not compare_and_save_file "$temp_pacman_filtered" "$pacman_file" "official pacman packages" $pacman_changed_var
-            cleanup_temp "$temp_pacman_filtered"
-            return 1
-        end
-        cleanup_temp "$temp_pacman_filtered"
+        rm -f "$temp_pacman"
+        echo $changed_files
         return 0
     end
 
-    function validate_output
-        set -l files $argv
-
-        for file in $files
-            if not test -f "$file"
-                echo "Error: Failed to create $file"
-                return 1
-            end
-        end
-    end
-
-    function show_summary
+    function show-summary
         set -l pacman_file $argv[1]
         set -l aur_file $argv[2]
         set -l groups_file $argv[3]
         set -l services_file $argv[4]
-        set -l changed_status $argv[5]
+        set -l total_changes $argv[5]
 
         set -l pacman_count (wc -l < "$pacman_file" 2>/dev/null || echo "0")
         set -l aur_count (wc -l < "$aur_file" 2>/dev/null || echo "0")
         set -l groups_count (wc -l < "$groups_file" 2>/dev/null || echo "0")
         set -l services_count (grep -v "^#\|^\$" "$services_file" 2>/dev/null | wc -l || echo "0")
 
-        echo "---" # Separator for clarity
-        echo "Workspace data summary:"
-        echo "  - Official packages: $pacman_count"
-        echo "  - AUR packages: $aur_count"
-        echo "  - User groups: $groups_count"
-        echo "  - Enabled services: $services_count"
+        echo "---"
+        echo "workspace data summary:"
+        echo "  - official packages: $pacman_count"
+        echo "  - aur packages: $aur_count"
+        echo "  - user groups: $groups_count"
+        echo "  - enabled services: $services_count"
         echo ""
 
-        if test "$changed_status" = "0"
+        if test $total_changes -eq 0
             echo "no changes detected in any workspace configuration files."
         else
             echo "changes detected and configuration files updated."
         end
     end
 
-    if not validate_environment
+    if not validate-environment
         return 1
     end
 
-    if not setup_directories
+    if not setup-directories
         return 1
     end
 
@@ -214,56 +159,58 @@ function backup-system-state -d "Save explicitly installed pacman and AUR packag
     set -l temp_groups (mktemp)
     set -l temp_services (mktemp)
 
-    set -g changed_pacman 0
-    set -g changed_aur 0
-    set -g changed_groups 0
-    set -g changed_services 0
-    set -g any_file_changed 0
+    set -l total_changes 0
 
-    if not get_all_packages "$temp_all"
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+    echo "collecting explicitly installed packages..."
+    if not get-packages "$temp_all" all
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
         return 1
     end
 
-    if not get_aur_packages "$temp_aur"
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+    echo "collecting explicitly installed aur packages..."
+    if not get-packages "$temp_aur" aur
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
         return 1
     end
 
-    if not save_package_files "$temp_all" "$temp_aur" "$pacman_file" "$aur_file" changed_pacman changed_aur
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+    set -l package_changes (save-package-files "$temp_all" "$temp_aur" "$pacman_file" "$aur_file")
+    if test $status -ne 0
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+        return 1
+    end
+    set total_changes (math $total_changes + $package_changes)
+
+    echo "collecting user groups..."
+    if not get-user-groups "$temp_groups"
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
         return 1
     end
 
-    if not get_user_groups "$temp_groups"
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+    if compare-and-update "$temp_groups" "$groups_file" "user groups"
+        if test $status -eq 0
+            set total_changes (math $total_changes + 1)
+        else
+            rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+            return 1
+        end
+    end
+
+    echo "collecting enabled systemd services..."
+    if not get-enabled-services "$temp_services"
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
         return 1
     end
 
-    if not compare_and_save_file "$temp_groups" "$groups_file" "user groups" changed_groups
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
-        return 1
+    if compare-and-update "$temp_services" "$services_file" "enabled services"
+        if test $status -eq 0
+            set total_changes (math $total_changes + 1)
+        else
+            rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+            return 1
+        end
     end
 
-    if not get_enabled_services "$temp_services"
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
-        return 1
-    end
+    rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
 
-    if not compare_and_save_file "$temp_services" "$services_file" "enabled services" changed_services
-        cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
-        return 1
-    end
-
-    cleanup_temp "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
-
-    if test "$changed_pacman" = "1" -o "$changed_aur" = "1" -o "$changed_groups" = "1" -o "$changed_services" = "1"
-        set -g any_file_changed 1
-    end
-
-    if not validate_output "$pacman_file" "$aur_file" "$groups_file" "$services_file"
-        return 1
-    end
-
-    show_summary "$pacman_file" "$aur_file" "$groups_file" "$services_file" "$any_file_changed"
+    show-summary "$pacman_file" "$aur_file" "$groups_file" "$services_file" $total_changes
 end

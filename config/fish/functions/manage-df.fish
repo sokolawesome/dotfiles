@@ -1,30 +1,22 @@
-function manage-df --description "Manage dotfiles using GNU Stow"
-    function validate_environment
+function manage-df -d "manage dotfiles using gnu stow"
+    function validate-environment
         if not set -q DOTFILES_PATH
-            echo "Error: \$DOTFILES_PATH is not set"
+            echo "error: \$DOTFILES_PATH is not set"
             return 1
         end
 
         if not test -d "$DOTFILES_PATH"
-            echo "Error: Dotfiles directory '$DOTFILES_PATH' does not exist"
+            echo "error: dotfiles directory '$DOTFILES_PATH' does not exist"
             return 1
         end
 
         if not command -q stow
-            echo "Error: GNU Stow is not installed. Install it with 'sudo pacman -S stow'."
+            echo "error: gnu stow is not installed. install it with 'sudo pacman -S stow'."
             return 1
         end
     end
 
-    function show_help
-        echo "Usage: manage-df [OPTIONS]"
-        echo "  -R, --restow     Restow packages (remove then stow)"
-        echo "  -D, --delete     Remove stowed packages"
-        echo "  -n, --dry-run    Show what would be done without doing it"
-        echo "  -h, --help       Show this help message"
-    end
-
-    function build_stow_command
+    function build-stow-command
         set -l restow $argv[1]
         set -l delete $argv[2]
         set -l dry_run $argv[3]
@@ -42,23 +34,23 @@ function manage-df --description "Manage dotfiles using GNU Stow"
         echo "$stow_cmd"
     end
 
-    function get_action_description
+    function get-action-description
         set -l restow $argv[1]
         set -l delete $argv[2]
         set -l dry_run $argv[3]
 
         if test "$restow" = true
-            echo "Restowing"
+            echo "restowing"
         else if test "$delete" = true
-            echo "Unstowing"
+            echo "unstowing"
         else if test "$dry_run" = true
-            echo "Dry-run"
+            echo "dry-run"
         else
-            echo "Stowing"
+            echo "stowing"
         end
     end
 
-    function get_target_directory
+    function get-target-directory
         set -l dir $argv[1]
 
         switch $dir
@@ -67,95 +59,82 @@ function manage-df --description "Manage dotfiles using GNU Stow"
             case config
                 echo "$HOME/.config"
             case '*'
-                echo ""
                 return 1
         end
     end
 
-    function ensure_target_exists
+    function ensure-target-exists
         set -l target $argv[1]
         set -l dir_name $argv[2]
 
         if test "$dir_name" = config
             if not test -d "$target"
-                echo "Creating ~/.config directory..."
-                mkdir -p "$target"
-                or begin
-                    echo "Error: Failed to create ~/.config"
-                    return 1
-                end
+                echo "creating ~/.config directory..."
+                mkdir -p "$target" || return 1
             end
         end
     end
 
-    function validate_source_directory
+    function validate-source-directory
         set -l dir $argv[1]
 
         if not test -d "$dir"
-            echo "Warning: '$dir/' directory not found in dotfiles"
+            echo "warning: '$dir/' directory not found in dotfiles"
             return 1
         end
     end
 
-    function execute_stow
+    function execute-stow
         set -l stow_cmd $argv[1]
         set -l target $argv[2]
         set -l dir $argv[3]
         set -l action $argv[4]
 
         echo "$action '$dir' → $target ..."
-        eval $stow_cmd -t "$target" "$dir"
-        or begin
-            echo "Error: Failed to $action $dir"
+        eval $stow_cmd -t "$target" "$dir" || begin
+            echo "error: failed to $action $dir"
             return 1
         end
     end
 
-    function process_directories
+    function process-directories
         set -l stow_cmd $argv[1]
         set -l action $argv[2]
 
         for dir in home config
-            if not validate_source_directory "$dir"
+            if not validate-source-directory "$dir"
                 continue
             end
 
-            set -l target (get_target_directory "$dir")
+            set -l target (get-target-directory "$dir")
             if test -z "$target"
-                echo "Error: Unknown directory type '$dir'"
+                echo "error: unknown directory type '$dir'"
                 return 1
             end
 
-            if not ensure_target_exists "$target" "$dir"
+            if not ensure-target-exists "$target" "$dir"
                 return 1
             end
 
-            if not execute_stow "$stow_cmd" "$target" "$dir" "$action"
+            if not execute-stow "$stow_cmd" "$target" "$dir" "$action"
                 return 1
             end
         end
     end
 
-    function safe_directory_change
-        set -l target_dir $argv[1]
-
-        pushd "$target_dir"
-        or begin
-            echo "Error: Failed to enter '$target_dir'"
-            return 1
-        end
+    if not validate-environment
+        return 1
     end
 
-    argparse R/restow D/delete n/dry-run h/help -- $argv
-    or return 1
+    argparse R/restow D/delete n/dry-run h/help -- $argv || return 1
 
     if set -q _flag_help
-        show_help
+        echo "usage: manage-df [OPTIONS]"
+        echo "  -R, --restow     restow packages (remove then stow)"
+        echo "  -D, --delete     remove stowed packages"
+        echo "  -n, --dry-run    show what would be done without doing it"
+        echo "  -h, --help       show this help message"
         return 0
-    end
-
-    if not validate_environment
-        return 1
     end
 
     set -l restow false
@@ -172,14 +151,12 @@ function manage-df --description "Manage dotfiles using GNU Stow"
         set dry_run true
     end
 
-    set -l stow_cmd (build_stow_command "$restow" "$delete" "$dry_run")
-    set -l action (get_action_description "$restow" "$delete" "$dry_run")
+    set -l stow_cmd (build-stow-command "$restow" "$delete" "$dry_run")
+    set -l action (get-action-description "$restow" "$delete" "$dry_run")
 
-    if not safe_directory_change "$DOTFILES_PATH"
-        return 1
-    end
+    pushd "$DOTFILES_PATH" || return 1
 
-    if not process_directories "$stow_cmd" "$action"
+    if not process-directories "$stow_cmd" "$action"
         popd
         return 1
     end

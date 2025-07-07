@@ -1,28 +1,30 @@
-function code2clip -d "Generate content from directory and copy to clipboard"
-    function _code2clip_validate_directory
+function code2clip -d "generate content from directory and copy to clipboard"
+    function validate-environment
+        if not command -q tree
+            echo "error: 'tree' command not found. install it with your package manager."
+            return 1
+        end
+
+        if not command -q find
+            echo "error: 'find' command not found."
+            return 1
+        end
+
+        if not command -q wl-copy
+            echo "error: 'wl-copy' command not found. install wl-clipboard package."
+            return 1
+        end
+    end
+
+    function validate-directory
         set -l target_dir $argv[1]
         if not test -d "$target_dir"
-            echo "Error: Directory '$target_dir' not found." >&2
+            echo "error: directory '$target_dir' not found."
             return 1
         end
     end
 
-    function _code2clip_check_dependencies
-        if not command -s tree > /dev/null
-            echo "Error: 'tree' command not found. Install it with your package manager (e.g., 'sudo apt install tree')." >&2
-            return 1
-        end
-        if not command -s find > /dev/null
-            echo "Error: 'find' command not found." >&2
-            return 1
-        end
-        if not command -s wl-copy > /dev/null
-            echo "Error: 'wl-copy' command not found. Install wl-clipboard package (e.g., 'sudo apt install wl-clipboard')." >&2
-            return 1
-        end
-    end
-
-    function _code2clip_build_exclude_pattern
+    function build-exclude-pattern
         set -l custom_exclude $argv[1]
         set -l default_exclude '\.git/|node_modules/|dist/|\.cache/|\.next/|\.idea/|\.vscode/|\.DS_Store|__pycache__/|\.lock$|\.sum$|\.svg$|\.kvconfig$|pywal\.json$|\.code\.md$|\.gitignore$|\.golangci\.yml$|^\.git$'
 
@@ -33,23 +35,20 @@ function code2clip -d "Generate content from directory and copy to clipboard"
         end
     end
 
-    function _code2clip_generate_tree_structure
+    function generate-tree-structure
         set -l target_dir $argv[1]
         set -l exclude_pattern $argv[2]
 
-        echo "## Directory Structure"
-        tree -a -I "$exclude_pattern" --noreport -L 3 "$target_dir"
-        or begin
-            echo "Error: Failed to generate directory tree for '$target_dir'." >&2
-            return 1
-        end
+        echo "## directory structure"
+        tree -a -I "$exclude_pattern" --noreport -L 3 "$target_dir" || return 1
     end
 
-    function _code2clip_print_file
+    function print-file-content
         set -l file $argv[1]
         set -l ext (string match -r '.*\.([^.]+)$' (basename "$file") | string replace -r '^.*\.' '' | string lower)
+
         echo ""
-        echo "### File: '$file'"
+        echo "### '$file'"
         if test -n "$ext"
             echo "```$ext"
         else
@@ -60,14 +59,15 @@ function code2clip -d "Generate content from directory and copy to clipboard"
         echo ""
     end
 
-    function _code2clip_generate_file_contents
+    function generate-file-contents
         set -l target_dir $argv[1]
         set -l exclude_pattern $argv[2]
 
-        echo "## File Contents"
+        echo ""
+        echo "## file contents"
 
         find "$target_dir" -type f -print0 | \
-            grep -zvE "$exclude_pattern" | \
+            grep -vzE "$exclude_pattern" | \
             while read -z file
                 if test -f "$file" -a -r "$file"
                     if test -f "$target_dir/.gitignore"
@@ -75,90 +75,81 @@ function code2clip -d "Generate content from directory and copy to clipboard"
                         and continue
                     end
 
-                    grep -Iq . "$file"
-                    or continue
-
-                    _code2clip_print_file "$file"
+                    grep -Iq . "$file" || continue
+                    print-file-content "$file"
                 end
             end
     end
 
-    function _code2clip_generate_content
+    function generate-content
         set -l target_dir $argv[1]
         set -l exclude_pattern $argv[2]
 
-        set -l tree_output (begin; _code2clip_generate_tree_structure "$target_dir" "$exclude_pattern"; end | string collect)
-        if test $status -ne 0
-            return 1
-        end
-        echo "$tree_output"
-
-        set -l file_contents_output (begin; _code2clip_generate_file_contents "$target_dir" "$exclude_pattern"; end | string collect)
-        if test $status -ne 0
-            return 1
-        end
-        echo "$file_contents_output"
+        generate-tree-structure "$target_dir" "$exclude_pattern" || return 1
+        generate-file-contents "$target_dir" "$exclude_pattern" || return 1
     end
 
-    set -l target_dir ""
-    set -l exclude_pattern ""
-    set -l output_mode "clipboard"
+    function output-content
+        set -l content $argv[1]
+        set -l output_mode $argv[2]
 
-    argparse 'e/exclude=' 'h/help' 'o/output=' -- $argv
-    or return 1
+        if test "$output_mode" = "stdout"
+            echo "$content"
+        else
+            echo "$content" | wl-copy || begin
+                echo "error: failed to copy to clipboard. is 'wl-copy' working correctly?"
+                return 1
+            end
+            echo "content successfully copied to clipboard!"
+        end
+    end
+
+    if not validate-environment
+        return 1
+    end
+
+    argparse 'e/exclude=' 'h/help' 'o/output=' -- $argv || return 1
 
     if set -q _flag_help
-        echo "Usage: code2clip [OPTIONS] <DIRECTORY>"
-        echo "Generate content from directory and copy to clipboard or stdout."
+        echo "usage: code2clip [OPTIONS] <DIRECTORY>"
+        echo "generate content from directory and copy to clipboard or stdout."
         echo ""
-        echo "Options:"
-        echo "  -e, --exclude <PATTERN>   Regex pattern to exclude files/directories"
+        echo "options:"
+        echo "  -e, --exclude <PATTERN>   regex pattern to exclude files/directories"
         echo "                            (overrides default exclusions)"
-        echo "  -o, --output <MODE>       Output mode: clipboard (default) or stdout"
-        echo "  -h, --help                Show this help message"
+        echo "  -o, --output <MODE>       output mode: clipboard (default) or stdout"
+        echo "  -h, --help                show this help message"
         echo ""
-        echo "Arguments:"
-        echo "  DIRECTORY                 Directory to process (REQUIRED)"
+        echo "arguments:"
+        echo "  DIRECTORY                 directory to process (required)"
         return 0
     end
 
     if test (count $argv) -eq 0
-        echo "Error: Directory argument is required." >&2
-        echo "Use 'code2clip --help' for usage information." >&2
+        echo "error: directory argument is required."
+        echo "use 'code2clip --help' for usage information."
         return 1
     end
+
+    set -l target_dir (realpath "$argv[1]")
+    set -l exclude_pattern (build-exclude-pattern "$_flag_exclude")
+    set -l output_mode "clipboard"
 
     if test -n "$_flag_output"
         set output_mode "$_flag_output"
     end
 
-    if not _code2clip_check_dependencies
+    if not validate-directory "$target_dir"
         return 1
     end
 
-    set target_dir (realpath "$argv[1]")
-    if not _code2clip_validate_directory "$target_dir"
-        return 1
-    end
+    echo "generating content from "(basename "$target_dir")" directory..."
 
-    set exclude_pattern (_code2clip_build_exclude_pattern "$_flag_exclude")
-
-    echo "Generating content from "(basename "$target_dir")" directory..."
-
-    set -l content (begin; _code2clip_generate_content "$target_dir" "$exclude_pattern"; end | string collect)
+    set -l content (generate-content "$target_dir" "$exclude_pattern" | string collect)
     if test $status -ne 0
-        echo "Error: Content generation failed." >&2
+        echo "error: content generation failed."
         return 1
     end
 
-    if test "$output_mode" = "stdout"
-        echo "$content"
-    else
-        echo "$content" | wl-copy
-        or begin
-            echo "Error: Failed to copy to clipboard. Is 'wl-copy' working correctly?" >&2
-            return 1
-        end
-        echo "Content successfully copied to clipboard!"
-    end
+    output-content "$content" "$output_mode"
 end
