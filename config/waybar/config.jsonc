@@ -36,7 +36,6 @@
         "format": "{text}",
         "tooltip": true,
         "return-type": "json",
-        "restart-interval": 1,
         "on-click-middle": "playerctl play-pause",
         "on-click-right": "playerctl next",
         "on-click-left": "playerctl previous",

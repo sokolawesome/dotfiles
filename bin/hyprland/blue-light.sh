@@ -1,13 +1,25 @@
 #!/bin/bash
 
-get_location_data() {
-    local ipinfo_response
-    ipinfo_response=$(curl -s "https://ipinfo.io/json")
+function validate-environment
+{
+    for cmd in curl jq wlsunset
+    do
+        if ! command -v "$cmd" >/dev/null 2>&1
+        then
+            echo "error: $cmd not found, install it with your package manager."
+            return 1
+        fi
+    done
+}
 
+function get-location-data
+{
+    local ipinfo_response=$(curl -s "https://ipinfo.io/json")
     local loc_str=$(echo "$ipinfo_response" | jq -r '.loc // "unknown"')
 
-    if [[ "$loc_str" == "unknown" || "$loc_str" == "null" ]]; then
-        echo "Error: Could not retrieve location data" >&2
+    if [ "$loc_str" = "unknown" ] || [ "$loc_str" = "null" ]
+    then
+        echo "error: could not retrieve location data"
         return 1
     fi
 
@@ -15,46 +27,58 @@ get_location_data() {
     local longitude=$(echo "$loc_str" | cut -d',' -f2)
 
     echo "$latitude $longitude"
-    return 0
 }
 
-start_wlsunset() {
-    if pgrep -f "wlsunset -l" >/dev/null; then
-        echo "wlsunset already running" >&2
-        return 0
+function start-wlsunset
+{
+    if pgrep -f "wlsunset -l" >/dev/null
+    then
+        echo "error: wlsunset is already running"
+        return 1
     fi
 
-    local location_data
-    location_data=$(get_location_data)
-
-    if [[ -z "$location_data" ]]; then
-        echo "Error: Failed to get location data for wlsunset" >&2
+    local location_data=$(get-location-data)
+    if [ -z "$location_data" ]
+    then
+        echo "error: failed to get location data for wlsunset"
         return 1
     fi
 
     local latitude=$(echo "$location_data" | cut -d' ' -f1)
     local longitude=$(echo "$location_data" | cut -d' ' -f2)
 
-    echo "Starting wlsunset with Lat: $latitude, Lon: $longitude" >&2
+    echo "starting wlsunset with latitude: $latitude, longitude: $longitude..."
     wlsunset -l "$latitude" "$longitude" -t 6000 2500 -S -60 -s +60 &
-    echo "wlsunset started" >&2
+    echo "wlsunset started successfully"
 }
 
-get_waybar_status() {
+function get-waybar-status
+{
     local temp=$(hyprctl hyprsunset temperature 2>/dev/null || echo "6000")
-
     echo "{\"text\": \"󱍖 ${temp}K\"}"
 }
 
-case "$1" in
-    "start"|"")
-        start_wlsunset
-        ;;
-    "status")
-        get_waybar_status
-        ;;
-    *)
-        echo "Usage: $0 [start|status]"
+function main
+{
+    if ! validate-environment
+    then
         exit 1
-        ;;
-esac
+    fi
+
+    case "$1" in
+        start|"")
+            start-wlsunset
+            ;;
+        status)
+            get-waybar-status
+            ;;
+        *)
+            echo "usage: $0 [start|status]"
+            echo "  start            start wlsunset with location-based settings"
+            echo "  status           show temperature status for Waybar"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
