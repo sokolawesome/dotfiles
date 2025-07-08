@@ -95,6 +95,7 @@ wget
 wireplumber
 wl-clip-persist
 wl-clipboard
+wlsunset
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 xdg-user-dirs

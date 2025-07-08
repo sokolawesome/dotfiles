@@ -22,6 +22,9 @@ get_target_directory() {
         config)
             echo "$HOME/.config"
             ;;
+        bin)
+            echo "$HOME/bin"
+            ;;
         *)
             return 1
             ;;
@@ -37,6 +40,14 @@ ensure_target_exists() {
             echo "Creating ~/.config directory..."
             mkdir -p "$target" || {
                 echo "Error: Failed to create ~/.config"
+                return 1
+            }
+        fi
+    elif [[ "$dir_name" == "bin" ]]; then
+        if [[ ! -d "$target" ]]; then
+            echo "Creating ~/bin directory..."
+            mkdir -p "$target" || {
+                echo "Error: Failed to create ~/bin"
                 return 1
             }
         fi
@@ -64,7 +75,7 @@ execute_stow() {
 }
 
 process_directories() {
-    for dir in home config; do
+    for dir in home config bin; do
         if ! validate_source_directory "$dir"; then
             continue
         fi

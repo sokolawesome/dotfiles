@@ -83,13 +83,12 @@ function backup-system-state -d "save explicitly installed pacman and aur packag
 
         set -l changed_files 0
 
-        if compare-and-update "$temp_aur" "$aur_file" "aur packages"
-            set -l status $status
-            if test $status -eq 0
-                set changed_files (math $changed_files + 1)
-            else if test $status -eq 2
-                return 1
-            end
+        compare-and-update "$temp_aur" "$aur_file" "aur packages" >/dev/null
+        set -l cmd_status $status
+        if test $cmd_status -eq 0
+            set changed_files (math $changed_files + 1)
+        else if test $cmd_status -eq 2
+            return 1
         end
 
         set -l temp_pacman (mktemp)
@@ -99,14 +98,13 @@ function backup-system-state -d "save explicitly installed pacman and aur packag
             cp "$temp_all" "$temp_pacman" || return 1
         end
 
-        if compare-and-update "$temp_pacman" "$pacman_file" "official pacman packages"
-            set -l status $status
-            if test $status -eq 0
-                set changed_files (math $changed_files + 1)
-            else if test $status -eq 2
-                rm -f "$temp_pacman"
-                return 1
-            end
+        compare-and-update "$temp_pacman" "$pacman_file" "official pacman packages" >/dev/null
+        set -l cmd_status $status
+        if test $cmd_status -eq 0
+            set changed_files (math $changed_files + 1)
+        else if test $cmd_status -eq 2
+            rm -f "$temp_pacman"
+            return 1
         end
 
         rm -f "$temp_pacman"
@@ -134,7 +132,7 @@ function backup-system-state -d "save explicitly installed pacman and aur packag
         echo "  - enabled services: $services_count"
         echo ""
 
-        if test $total_changes -eq 0
+        if test -n "$total_changes" -a "$total_changes" -eq 0
             echo "no changes detected in any workspace configuration files."
         else
             echo "changes detected and configuration files updated."
@@ -174,11 +172,14 @@ function backup-system-state -d "save explicitly installed pacman and aur packag
     end
 
     set -l package_changes (save-package-files "$temp_all" "$temp_aur" "$pacman_file" "$aur_file")
-    if test $status -ne 0
+    set -l save_status $status
+    if test $save_status -ne 0
         rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
         return 1
     end
-    set total_changes (math $total_changes + $package_changes)
+    if test -n "$package_changes"
+        set total_changes (math $total_changes + $package_changes)
+    end
 
     echo "collecting user groups..."
     if not get-user-groups "$temp_groups"
@@ -186,13 +187,13 @@ function backup-system-state -d "save explicitly installed pacman and aur packag
         return 1
     end
 
-    if compare-and-update "$temp_groups" "$groups_file" "user groups"
-        if test $status -eq 0
-            set total_changes (math $total_changes + 1)
-        else
-            rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
-            return 1
-        end
+    compare-and-update "$temp_groups" "$groups_file" "user groups" >/dev/null
+    set -l cmd_status $status
+    if test $cmd_status -eq 0
+        set total_changes (math $total_changes + 1)
+    else if test $cmd_status -eq 2
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+        return 1
     end
 
     echo "collecting enabled systemd services..."
@@ -201,13 +202,13 @@ function backup-system-state -d "save explicitly installed pacman and aur packag
         return 1
     end
 
-    if compare-and-update "$temp_services" "$services_file" "enabled services"
-        if test $status -eq 0
-            set total_changes (math $total_changes + 1)
-        else
-            rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
-            return 1
-        end
+    compare-and-update "$temp_services" "$services_file" "enabled services" >/dev/null
+    set -l cmd_status $status
+    if test $cmd_status -eq 0
+        set total_changes (math $total_changes + 1)
+    else if test $cmd_status -eq 2
+        rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"
+        return 1
     end
 
     rm -f "$temp_all" "$temp_aur" "$temp_groups" "$temp_services"

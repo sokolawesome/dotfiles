@@ -4,8 +4,10 @@
     "height": 30,
 
     "modules-left": ["hyprland/workspaces", "custom/divider", "custom/media"],
-    "modules-center": ["clock", "custom/divider", "custom/hyprsunset"],
+    "modules-center": ["clock", "custom/divider", "custom/blue-light"],
     "modules-right": [
+        "custom/vpn",
+        "custom/divider",
         "pulseaudio",
         "custom/divider",
         "custom/temperature",
@@ -30,7 +32,7 @@
     },
 
     "custom/media": {
-        "exec": "~/.config/waybar/scripts/media.sh",
+        "exec": "~/bin/waybar/media.sh",
         "format": "{text}",
         "tooltip": true,
         "return-type": "json",
@@ -46,12 +48,20 @@
         "tooltip": false,
     },
 
-    "custom/hyprsunset": {
+    "custom/blue-light": {
         "format": "{}",
         "return-type": "json",
-        "exec": "~/.config/waybar/scripts/hyprsunset.sh status",
-        "on-click": "~/.config/waybar/scripts/hyprsunset.sh toggle",
+        "exec": "~/bin/hyprland/blue-light.sh status",
+        "interval": 60,
+        "tooltip": false,
+    },
+
+    "custom/vpn": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/bin/waybar/vpn.sh status",
         "interval": 5,
+        "on-click": "~/bin/waybar/vpn.sh toggle",
         "tooltip": false,
     },
 
@@ -60,8 +70,8 @@
         "format-muted": "VOL: MUT",
         "scroll-step": 5,
         "on-click": "pamixer -t",
-        "on-scroll-up": "pamixer -i 5 --allow-boost && ~/.config/hypr/scripts/volume.sh",
-        "on-scroll-down": "pamixer -d 5 --allow-boost && ~/.config/hypr/scripts/volume.sh",
+        "on-scroll-up": "pamixer -i 5 --allow-boost && ~/bin/hyprland/volume.sh",
+        "on-scroll-down": "pamixer -d 5 --allow-boost && ~/bin/hyprland/volume.sh",
         "on-click-right": "pavucontrol",
         "tooltip": false,
     },

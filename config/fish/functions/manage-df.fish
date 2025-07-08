@@ -58,6 +58,8 @@ function manage-df -d "manage dotfiles using gnu stow"
                 echo "$HOME"
             case config
                 echo "$HOME/.config"
+            case bin
+                echo "$HOME/bin"
             case '*'
                 return 1
         end
@@ -71,6 +73,11 @@ function manage-df -d "manage dotfiles using gnu stow"
             if not test -d "$target"
                 echo "creating ~/.config directory..."
                 mkdir -p "$target" || return 1
+            end
+        else if test "$dir_name" = bin
+            if not test -d "$target"
+                echo "creating ~/bin directory..."
+                mkdir -p "$target/bin" || return 1
             end
         end
     end
@@ -101,7 +108,7 @@ function manage-df -d "manage dotfiles using gnu stow"
         set -l stow_cmd $argv[1]
         set -l action $argv[2]
 
-        for dir in home config
+        for dir in home config bin
             if not validate-source-directory "$dir"
                 continue
             end

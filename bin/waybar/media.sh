@@ -11,10 +11,6 @@ json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
-xml_escape() {
-    printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&apos;/g'
-}
-
 format_display() {
     local status="$1"
     local artist="$2"
@@ -56,8 +52,8 @@ output_json() {
     local text="$1"
     local tooltip="$2"
 
-    local escaped_text=$(xml_escape "$(json_escape "$text")")
-    local escaped_tooltip=$(xml_escape "$(json_escape "$tooltip")")
+    local escaped_text="$(json_escape "$text")"
+    local escaped_tooltip="$(json_escape "$tooltip")"
 
     echo "{\"text\": \"$escaped_text\", \"tooltip\": \"$escaped_tooltip\"}"
 }
