@@ -47,6 +47,8 @@ libva-nvidia-driver
 linux-firmware
 linux-zen
 linux-zen-headers
+lua-jsregexp
+luarocks
 ly
 mako
 man-db
@@ -88,6 +90,7 @@ swww
 tailscale
 telegram-desktop
 tree
+tree-sitter-cli
 ttf-jetbrains-mono-nerd
 unzip
 waybar

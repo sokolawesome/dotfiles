@@ -17,56 +17,105 @@ function code2clip -d "generate content from directory and copy to clipboard"
     end
 
     function get-basic-exclude-pattern
-        echo '\.git/|\.DS_Store|\.idea/|\.vscode/|\.zed/|\.lock$|\.svg$|\.gitignore$'
-    end
+        set -l patterns \
+            # Version control
+            '\.git/' '\.gitignore$' '\.gitmodules$' '\.gitattributes$' \
+            '\.hg/' '\.svn/' '\.bzr/' \
+            # IDE and editor configurations
+            '\.DS_Store' '\.idea/' '\.vscode/' '\.zed/' '\.vs/' \
+            '\.code-workspace$' '\.project$' '\.settings/' '\.classpath$' \
+            '\.sublime-project$' '\.sublime-workspace$' '\.history/' \
+            # Temporary and backup files
+            '\.bak$' '\.swp$' '\.swo$' '\.tmp$' '\.temp$' '~$' '\.#.*' \
+            '\.lock$' '\.cache$' '\.tempdir/' '\.temporary/' \
+            # Logs and caches
+            '\.log$' '\.log\.[0-9]+$' '\.cache/' '\.pytest_cache/' '\.ruff_cache/' \
+            '\.tox/' '\.venv/' 'venv/' '\.env/' '\.__pycache__/' \
+            # Binary and archive files
+            '\.zip$' '\.tar\.gz$' '\.rar$' '\.7z$' '\.tar$' '\.bz2$' '\.gz$' \
+            '\.exe$' '\.dll$' '\.so$' '\.dylib$' '\.o$' '\.obj$' '\.a$' \
+            '\.class$' '\.jar$' '\.war$' '\.ear$' \
+            '\.deb$' '\.rpm$' '\.dmg$' '\.iso$' '\.img$' \
+            # Media files
+            '\.png$' '\.jpg$' '\.jpeg$' '\.gif$' '\.bmp$' '\.ico$' '\.webp$' \
+            '\.svg$' '\.mp4$' '\.mp3$' '\.wav$' '\.avi$' '\.mkv$' '\.mov$' \
+            '\.wmv$' '\.flv$' '\.webm$' '\.ogg$' \
+            # Documentation and misc
+            '\.pdf$' '\.doc$' '\.docx$' '\.xls$' '\.xlsx$' '\.ppt$' '\.pptx$' \
+            # Web development
+            'node_modules/' 'dist/' 'build/' 'out/' 'public/build/' \
+            '\.next/' '\.nuxt/' '\.parcel-cache/' 'coverage/' '\.nyc_output/' \
+            '\.angular/' '\.svelte-kit/' '\.vite/' '\.astro/' '\.gatsby-cache/' \
+            '\.sass-cache/' 'coverage/' 'lerna-debug\.log$' '\.eslintcache$' \
+            'package-lock\.json' 'environments/' \
+            # Go
+            'go\.mod$' 'go\.sum$' '\.test$' '\.out$' 'vendor/' 'pkg/' 'bin/' \
+            # Rust
+            'target/' 'Cargo\.lock$' '\.cargo/' '\.rustc/' \
+            # C# and ASP.NET
+            'obj/' 'bin/' 'publish/' '\.csproj\.user$' '\.suo$' '\.user$' \
+            '\.sln\.docstates$' 'TestResults/' 'packages/' '\.nuget/' '\.pdb$' \
+            # Miscellaneous build and test artifacts
+            '\.min\.js$' '\.map$' '\.coverage$' '\.lcov$' '\.profraw$' \
+            'test-reports/' 'build-artifacts/' 'tmp/' 'temp/' \
+            # Database and configuration
+            '\.db$' '\.sqlite3$' '\.sql$' '\.bak\.sql$' '\.env\.local$' \
+            '\.env\.development$' '\.env\.production$' '\.env'
 
-    function get-preset-exclude-pattern
-        set -l preset $argv[1]
-
-        switch $preset
-            case web
-                echo 'node_modules/|dist/|build/|\.cache/|\.next/|\.nuxt/|coverage/|\.nyc_output/|\.parcel-cache/'
-            case go
-                echo 'bin/|pkg/|vendor/|go\.mod$|go\.sum$|\.test$'
-            case rust
-                echo 'target/|Cargo\.lock$|\.cargo/'
-            case dotnet
-                echo 'bin/|obj/|\.vs/|packages/|\.nuget/|TestResults/|\.user$|\.suo$'
-            case '*'
-                echo ""
-        end
+        string join '|' $patterns
     end
 
     function build-exclude-pattern
-        set -l preset_or_custom $argv[1]
+        set -l additional $argv[1]
         set -l basic_pattern (get-basic-exclude-pattern)
 
-        if test -z "$preset_or_custom"
+        if test -z "$additional"
             echo "$basic_pattern"
         else
-            set -l preset_pattern (get-preset-exclude-pattern "$preset_or_custom")
+            echo "$basic_pattern|$additional"
+        end
+    end
 
-            if test -z "$preset_pattern"
-                echo "$basic_pattern|$preset_or_custom"
-            else
-                echo "$basic_pattern|$preset_pattern"
+    function find-git-repos
+        set -l dir $argv[1]
+        find "$dir" -type d -name '.git' | while read git_dir
+            dirname "$git_dir"
+        end
+    end
+
+    function get-repo-for-file
+        set -l file $argv[1]
+        set -l repos $argv[2..]
+
+        set -l longest_match ""
+        for repo in $repos
+            if string match -q "$repo/*" "$file"
+                if test (string length "$repo") -gt (string length "$longest_match")
+                    set longest_match "$repo"
+                end
             end
         end
+
+        echo "$longest_match"
+    end
+
+    function is-file-ignored
+        set -l file $argv[1]
+        set -l repo $argv[2]
+
+        if test -z "$repo"
+            return 1
+        end
+
+        git -C "$repo" check-ignore "$file" >/dev/null 2>&1
     end
 
     function generate-tree-structure
         set -l dir $argv[1]
         set -l exclude $argv[2]
+
         echo "## directory structure"
-
-        if test -f "$dir/.gitignore"
-            set -l gitignore_patterns (cat "$dir/.gitignore" | grep -v '^#' | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
-            if test -n "$gitignore_patterns"
-                set exclude "$exclude|$gitignore_patterns"
-            end
-        end
-
-        tree -a -I "$exclude" --noreport -L 3 "$dir" || return 1
+        tree -a -I "$exclude" --noreport -L 6 "$dir" || return 1
     end
 
     function print-file-content
@@ -78,7 +127,6 @@ function code2clip -d "generate content from directory and copy to clipboard"
         echo "```$ext"
         cat "$file"
         echo "```"
-        echo ""
     end
 
     function generate-file-contents
@@ -88,15 +136,19 @@ function code2clip -d "generate content from directory and copy to clipboard"
         echo ""
         echo "## file contents"
 
+        set -l git_repos (find-git-repos "$dir")
+
         find "$dir" -type f -print0 | grep -vzE "$exclude" | while read -z file
             if test -f "$file" -a -r "$file"
-                if test -f "$dir/.gitignore"
-                    if git -C "$dir" check-ignore "$file" > /dev/null 2>&1
+                grep -Iq . "$file" || continue
+
+                set -l repo (get-repo-for-file "$file" $git_repos)
+                if test -n "$repo"
+                    if is-file-ignored "$file" "$repo"
                         continue
                     end
                 end
 
-                grep -Iq . "$file" || continue
                 print-file-content "$file"
             end
         end
@@ -141,8 +193,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
         echo "generate content from directory and copy to clipboard or stdout."
         echo ""
         echo "options:"
-        echo "  -e, --exclude <NAME|REGEX>   exclude pattern or preset"
-        echo "                               presets: web, go, rust, dotnet"
+        echo "  -e, --exclude <REGEX>        additional exclude pattern"
         echo "  -o, --output <MODE>          output mode: clipboard (default) or stdout"
         echo "  -t, --no-tree                do not include dir tree structure"
         echo "  -h, --help                   show this help message"

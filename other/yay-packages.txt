@@ -1,7 +1,7 @@
+catppuccin-gtk-theme-macchiato
 joplin-bin
 omnisharp-roslyn
 rose-pine-cursor
-rose-pine-gtk-theme
 rose-pine-hyprcursor
 ventoy-bin
 visual-studio-code-bin

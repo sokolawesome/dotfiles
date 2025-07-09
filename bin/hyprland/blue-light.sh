@@ -48,7 +48,7 @@ function start-wlsunset
     local longitude=$(echo "$location_data" | cut -d' ' -f2)
 
     echo "starting wlsunset with latitude: $latitude, longitude: $longitude..."
-    wlsunset -l "$latitude" "$longitude" -t 6000 2500 -S -60 -s +60 &
+    wlsunset -l "$latitude" -L "$longitude" -t 2500 -T 6000
     echo "wlsunset started successfully"
 }
 

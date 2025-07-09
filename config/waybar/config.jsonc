@@ -6,8 +6,6 @@
     "modules-left": ["hyprland/workspaces", "custom/divider", "custom/media"],
     "modules-center": ["clock", "custom/divider", "custom/blue-light"],
     "modules-right": [
-        "custom/vpn",
-        "custom/divider",
         "pulseaudio",
         "custom/divider",
         "custom/temperature",
@@ -15,6 +13,8 @@
         "cpu",
         "custom/divider",
         "memory",
+        "custom/divider",
+        "custom/vpn",
         "custom/divider",
         "hyprland/language",
         "custom/divider",
@@ -55,15 +55,6 @@
         "tooltip": false,
     },
 
-    "custom/vpn": {
-        "format": "{}",
-        "return-type": "json",
-        "exec": "~/bin/waybar/vpn.sh status",
-        "interval": 5,
-        "on-click": "~/bin/waybar/vpn.sh toggle",
-        "tooltip": false,
-    },
-
     "pulseaudio": {
         "format": "VOL: {volume}%",
         "format-muted": "VOL: MUT",
@@ -93,6 +84,15 @@
         "interval": 5,
         "format": "RAM: {used:0.1f}G",
         "on-click": "kitty -e btop",
+        "tooltip": false,
+    },
+
+    "custom/vpn": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/bin/waybar/vpn.sh status",
+        "interval": 5,
+        "on-click": "~/bin/waybar/vpn.sh toggle",
         "tooltip": false,
     },
 
