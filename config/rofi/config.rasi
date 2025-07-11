@@ -3,11 +3,11 @@
 
 configuration {
     modi:                       "drun,run,window,ssh,filebrowser";
-    display-drun:               "󰣇 Apps";
-    display-run:                "󰅴 Run";
-    display-window:             "󰖲 Windows";
-    display-ssh:                "󰢹 SSH";
-    display-filebrowser:        "󰉋 Files";
+    display-drun:               "󰣇 Apps ";
+    display-run:                "󰅴 Run ";
+    display-window:             "󰖲 Windows ";
+    display-ssh:                "󰢹 SSH ";
+    display-filebrowser:        "󰉋 Files ";
 
     drun-display-format:        "{name} [<span weight='light' size='small'><i>{generic}</i></span>]";
     window-format:              "{w} · {c} · {t}";
@@ -15,7 +15,7 @@ configuration {
     show-icons:                 true;
     icon-theme:                 "Papirus-Dark";
 
-    font:                       "JetBrainsMono Nerd Font 16";
+    font:                       "CaskaydiaCove Nerd Font 16";
 
     me-select-entry:            "";
     me-accept-entry:            "MousePrimary";

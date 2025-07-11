@@ -1,6 +1,5 @@
 7zip
 amd-ucode
-aspnet-runtime
 aspnet-runtime-8.0
 base
 base-devel
@@ -13,7 +12,6 @@ cava
 cliphist
 delve
 dkms
-dotnet-sdk
 dotnet-sdk-8.0
 efibootmgr
 eza
@@ -33,6 +31,7 @@ gtk4-layer-shell
 hypridle
 hyprland
 hyprlock
+hyprpicker
 hyprsunset
 jq
 just
@@ -91,7 +90,7 @@ tailscale
 telegram-desktop
 tree
 tree-sitter-cli
-ttf-jetbrains-mono-nerd
+ttf-cascadia-code-nerd
 unzip
 waybar
 wget

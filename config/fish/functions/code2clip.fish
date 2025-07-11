@@ -43,7 +43,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
             # Documentation and misc
             '\.pdf$' '\.doc$' '\.docx$' '\.xls$' '\.xlsx$' '\.ppt$' '\.pptx$' \
             # Web development
-            'node_modules/' 'dist/' 'build/' 'out/' 'public/build/' \
+            'node_modules/' 'dist/' 'build/' 'out/' 'public/' \
             '\.next/' '\.nuxt/' '\.parcel-cache/' 'coverage/' '\.nyc_output/' \
             '\.angular/' '\.svelte-kit/' '\.vite/' '\.astro/' '\.gatsby-cache/' \
             '\.sass-cache/' 'coverage/' 'lerna-debug\.log$' '\.eslintcache$' \
@@ -126,6 +126,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
         echo "### '$file'"
         echo "```$ext"
         cat "$file"
+        echo ""
         echo "```"
     end
 

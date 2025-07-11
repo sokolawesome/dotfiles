@@ -18,7 +18,7 @@
 @define-color highlightHigh   #56526e;
 
 * {
-    font-family: JetBrainsMono Nerd Font;
+    font-family: CaskaydiaCove Nerd Font;
     font-size: 18px;
     font-weight: 700;
     padding: 0;
@@ -44,6 +44,7 @@
     background: none;
     transition: none;
     border: none;
+    color: @text;
 }
 
 #workspaces button:hover {

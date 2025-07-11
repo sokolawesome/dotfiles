@@ -1,11 +1,11 @@
 {
     "icon_theme": "Material Icon Theme",
-    "ui_font_family": "DejaVu Sans",
-    "buffer_font_family": "JetBrainsMono Nerd Font",
+    "ui_font_family": "Noto Sans",
+    "buffer_font_family": "CaskaydiaCove Nerd Font",
     "ui_font_size": 16,
     "buffer_font_size": 16,
 
-    "preferred_line_length": 160,
+    "preferred_line_length": 100,
     "tab_size": 4,
 
     "theme": {

@@ -1,4 +1,5 @@
 catppuccin-gtk-theme-macchiato
+dotnet-sdk-bin
 joplin-bin
 omnisharp-roslyn
 rose-pine-cursor
