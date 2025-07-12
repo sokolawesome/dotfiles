@@ -38,6 +38,7 @@ just
 kitty
 kvantum
 lazygit
+lemurs
 less
 lib32-nvidia-utils
 libnotify
@@ -82,6 +83,7 @@ ripgrep
 rofi-wayland
 slurp
 smartmontools
+starship
 steam
 stow
 swappy

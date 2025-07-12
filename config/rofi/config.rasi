@@ -34,40 +34,98 @@ window {
     anchor:                     center;
     fullscreen:                 false;
     enabled:                    true;
+
+    border-radius:              @border-radius-large;
+    border-color:               @ora;
+    border:                     5;
+    border-radius:              0;
+    padding:                    @padding-normal;
 }
 
 listview {
-    columns:                    2;
+    columns:                    1;
     lines:                      10;
     fixed-height:               true;
     fixed-columns:              true;
     cycle:                      true;
     scrollbar:                  false;
+    spacing:                    @spacing-small;
+    border-color:               @separatorcolor;
+    padding:                    @padding-small;
 }
 
 inputbar {
-    children:                   ["prompt", "entry"];
+    children:                   ["prompt","entry"];
 }
 
 entry {
     placeholder:                "search...";
     cursor:                     text;
+    cursor-color:               @cya;
+    spacing:                    0;
+    text-color:                 @cya;
+}
+
+prompt {
+    spacing:                    0;
+    text-color:                 @grn;
+    weight:                     bold;
 }
 
 mainbox {
     children:                   ["inputbar", "listview", "message"];
+    border:                     0;
+    padding:                    @padding-normal;
 }
 
 element {
     cursor:                     pointer;
+    border:                     0;
+    padding:                    @padding-small;
 }
 
 element-icon {
-    size:                       24px;
+    size:                       28px;
     cursor:                     inherit;
 }
 
 element-text {
     vertical-align:             0.5;
     markup:                     true;
+}
+
+#message {
+    border:                     1px dash 0px 0px;
+    border-color:               @separatorcolor;
+    padding:                    10px;
+}
+
+#element.normal.normal {
+    background-color:           @background;
+    text-color:                 @foreground;
+}
+
+#element.normal.urgent {
+    background-color:           @urgent-background;
+    text-color:                 @urgent-foreground;
+}
+
+#element.normal.active {
+    background-color:           @yel;
+    text-color:                 #000000;
+}
+
+#element.selected.normal {
+    background-color:           @selected-background;
+    text-color:                 #ffffff;
+}
+
+#element.selected.urgent {
+    background-color:           @selected-urgent-background;
+    text-color:                 #ffffff;
+}
+
+#element.selected.active {
+    background-color:           @selected-active-background;
+    text-color:                 #000000;
 }

@@ -14,7 +14,7 @@ function validate-environment
 
 function run-rofi
 {
-    cliphist list | rofi -dmenu -p " Clipboard" -config ~/.config/rofi/clipboard.rasi \
+    cliphist list | rofi -dmenu -p " Clipboard " -config ~/.config/rofi/clipboard.rasi \
         -kb-custom-1 "Alt+d" \
         -kb-custom-2 "Alt+Delete" \
         -kb-custom-3 "Alt+c" \
