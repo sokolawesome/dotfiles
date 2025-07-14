@@ -2,7 +2,7 @@
     background-image: none;
     box-shadow: none;
     font-family: "Noto Sans", sans-serif;
-    font-size: 20px;
+    font-size: 24px;
 }
 
 window {
@@ -14,12 +14,12 @@ button {
     background-color: #2a273f;
     border: 2px solid #44415a;
     border-radius: 12px;
-    margin: 10px;
-    padding: 20px;
+    padding: 0px;
+    margin: 250px 50px 250px 50px;
     font-weight: bold;
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 250px;
+    background-size: 150px;
 }
 
 button:focus,

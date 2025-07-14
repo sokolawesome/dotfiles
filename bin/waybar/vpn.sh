@@ -26,7 +26,6 @@ function get-vpn-status
 
 function start-vpn
 {
-    local vpn_process_name="outline-cli"
     local vpn_log_file="${VPN_LOG_FILE:-/dev/null}"
 
     if [ -z "$OUTLINE_VPN_URL" ]
