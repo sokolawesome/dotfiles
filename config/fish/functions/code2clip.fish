@@ -42,6 +42,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
             '\.wmv$' '\.flv$' '\.webm$' '\.ogg$' \
             # Documentation and misc
             '\.pdf$' '\.doc$' '\.docx$' '\.xls$' '\.xlsx$' '\.ppt$' '\.pptx$' \
+            'LICENSE' \
             # Web development
             'node_modules/' 'dist/' 'build/' 'out/' 'public/' \
             '\.next/' '\.nuxt/' '\.parcel-cache/' 'coverage/' '\.nyc_output/' \

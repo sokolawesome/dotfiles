@@ -6,9 +6,14 @@ vim.opt.hidden = true
 vim.opt.encoding = 'UTF-8'
 vim.opt.ttimeoutlen = 10
 
+-- Providers
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_ruby_provider = 0
+vim.g.loaded_python3_provider = 0
+
 -- UI
 vim.opt.number = true
-vim.opt.relativenumber = false
+vim.opt.relativenumber = true
 vim.opt.splitright = true
 vim.opt.splitbelow = true
 vim.opt.termguicolors = true
@@ -19,9 +24,9 @@ vim.opt.showmatch = true
 vim.opt.inccommand = 'split'
 
 -- Tabs and Indentation
-vim.opt.tabstop = 2
-vim.opt.shiftwidth = 2
-vim.opt.softtabstop = 2
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.softtabstop = 4
 vim.opt.expandtab = true
 vim.opt.autoindent = true
 vim.opt.smartindent = true

@@ -9,7 +9,7 @@ return {
             enable_cmp_source = false,
             virtual_text = {
                 enabled = true,
-                idle_delay = 1000,
+                idle_delay = 400,
             }
         })
     end,

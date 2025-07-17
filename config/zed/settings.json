@@ -10,8 +10,8 @@
 
     "theme": {
         "mode": "system",
-        "light": "Rosé Pine Moon",
-        "dark": "Rosé Pine Moon"
+        "light": "Gruvbox Dark Hard",
+        "dark": "Gruvbox Dark Hard"
     },
 
     "tabs": {
