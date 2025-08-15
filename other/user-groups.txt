@@ -1,4 +1,5 @@
 input
+seat
 sokolawesome
 video
 wheel
