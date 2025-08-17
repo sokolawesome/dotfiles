@@ -1,0 +1,40 @@
+{
+  "timeStamp": 1755437359594,
+  "version": "1.65.0",
+  "userSettings": {
+    "importedLists": [],
+    "popupPanelSections": 15
+  },
+  "selectedFilterLists": [
+    "user-filters",
+    "ublock-filters",
+    "ublock-badware",
+    "ublock-privacy",
+    "ublock-quick-fixes",
+    "ublock-unbreak",
+    "easylist",
+    "adguard-generic",
+    "adguard-mobile",
+    "easyprivacy",
+    "adguard-spyware-url",
+    "urlhaus-1",
+    "plowe-0",
+    "adguard-cookies",
+    "ublock-cookies-adguard",
+    "adguard-social",
+    "adguard-mobile-app-banners",
+    "adguard-other-annoyances",
+    "adguard-popup-overlays",
+    "adguard-widgets",
+    "ublock-annoyances"
+  ],
+  "hiddenSettings": {},
+  "whitelist": [
+    "chrome-extension-scheme",
+    "moz-extension-scheme"
+  ],
+  "dynamicFilteringString": "behind-the-scene * * noop\nbehind-the-scene * inline-script noop\nbehind-the-scene * 1p-script noop\nbehind-the-scene * 3p-script noop\nbehind-the-scene * 3p-frame noop\nbehind-the-scene * image noop\nbehind-the-scene * 3p noop",
+  "urlFilteringString": "",
+  "hostnameSwitchesString": "no-large-media: behind-the-scene false\nno-csp-reports: * true",
+  "userFilters": "! 13 Jul 2025 https://dev.to\ndev.to##.popover-billboard--menuopenupwards.right-0.left-0.bottom-0.fixed.js-billboard.crayons-story__billboard.popover-billboard.crayons-bb.crayons-card--secondary.crayons-card\ndev.to##.crayons-layout__sidebar-right"
+}
