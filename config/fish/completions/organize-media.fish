@@ -23,7 +23,7 @@ complete -c organize-media \
 
 complete -c organize-media \
     -s i -l id \
-    -x -d "tvdb id"
+    -x -d "tvdb id (for shows: comma-separated show,season1,season2...)"
 
 complete -c organize-media \
     -s s -l seasons \
