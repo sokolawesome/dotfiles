@@ -2,9 +2,18 @@
     "layer": "top",
     "position": "top",
     "height": 30,
-
-    "modules-left": ["hyprland/workspaces", "custom/divider", "custom/media"],
-    "modules-center": ["clock", "custom/divider", "custom/blue-light"],
+    "modules-left": [
+        "hyprland/workspaces",
+        "custom/divider",
+        "custom/media"
+    ],
+    "modules-center": [
+        "clock",
+        "custom/divider",
+        "custom/blue-light",
+        "custom/divider",
+        "idle_inhibitor"
+    ],
     "modules-right": [
         "pulseaudio",
         "custom/divider",
@@ -20,17 +29,25 @@
         "custom/divider",
         "tray",
     ],
-
     "hyprland/workspaces": {
         "on-click": "activate",
         "active-only": false,
         "format": "{id}",
         "persistent-workspaces": {
-            "DP-6": [5, 6, 7, 8],
-            "DP-5": [1, 2, 3, 4],
+            "DP-6": [
+                5,
+                6,
+                7,
+                8
+            ],
+            "DP-5": [
+                1,
+                2,
+                3,
+                4
+            ],
         },
     },
-
     "custom/media": {
         "exec": "~/bin/waybar/media.sh",
         "format": "{text}",
@@ -41,12 +58,10 @@
         "on-click-left": "playerctl previous",
         "max-length": 47,
     },
-
     "clock": {
         "format": "{:%H:%M | %d.%m.%Y}",
         "tooltip": false,
     },
-
     "custom/blue-light": {
         "format": "{}",
         "return-type": "json",
@@ -54,7 +69,13 @@
         "interval": 60,
         "tooltip": false,
     },
-
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": {
+            "activated": " ",
+            "deactivated": " ",
+        }
+    },
     "pulseaudio": {
         "format": "VOL: {volume}%",
         "format-muted": "VOL: MUT",
@@ -65,28 +86,24 @@
         "on-click-right": "pavucontrol",
         "tooltip": false,
     },
-
     "custom/temperature": {
         "exec": "sensors | awk '/Tccd1:/ {print int($2)}'",
         "format": "CPU TEMP: {}°C",
         "interval": 5,
         "tooltip": false,
     },
-
     "cpu": {
         "interval": 5,
         "format": "USAGE: {usage}%",
         "on-click": "kitty -e btop",
         "tooltip": false,
     },
-
     "memory": {
         "interval": 5,
         "format": "RAM: {used:0.1f}G",
         "on-click": "kitty -e btop",
         "tooltip": false,
     },
-
     "custom/vpn": {
         "format": "{}",
         "return-type": "json",
@@ -95,22 +112,18 @@
         "on-click": "~/bin/waybar/vpn.sh toggle",
         "tooltip": false,
     },
-
     "hyprland/language": {
         "format-en": "EN",
         "format-ru": "RU",
     },
-
     "tray": {
         "icon-size": 18,
         "spacing": 10,
     },
-
     "custom/divider": {
         "format": " | ",
         "tooltip": false,
     },
-
     "custom/space": {
         "format": " ",
         "tooltip": false,

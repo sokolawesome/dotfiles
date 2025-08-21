@@ -30,7 +30,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
             '\.lock$' '\.cache$' '\.tempdir/' '\.temporary/' \
             # Logs and caches
             '\.log$' '\.log\.[0-9]+$' '\.cache/' '\.pytest_cache/' '\.ruff_cache/' \
-            '\.tox/' '\.venv/' 'venv/' '\.env/' '\.__pycache__/' \
+            '\.tox/' '\.venv/' venv/ '\.env/' '\.__pycache__/' \
             # Binary and archive files
             '\.zip$' '\.tar\.gz$' '\.rar$' '\.7z$' '\.tar$' '\.bz2$' '\.gz$' \
             '\.exe$' '\.dll$' '\.so$' '\.dylib$' '\.o$' '\.obj$' '\.a$' \
@@ -42,23 +42,25 @@ function code2clip -d "generate content from directory and copy to clipboard"
             '\.wmv$' '\.flv$' '\.webm$' '\.ogg$' \
             # Documentation and misc
             '\.pdf$' '\.doc$' '\.docx$' '\.xls$' '\.xlsx$' '\.ppt$' '\.pptx$' \
-            'LICENSE' \
+            LICENSE \
             # Web development
-            'node_modules/' 'dist/' 'build/' 'out/' 'public/' \
-            '\.next/' '\.nuxt/' '\.parcel-cache/' 'coverage/' '\.nyc_output/' \
+            node_modules/ dist/ build/ out/ public/ \
+            '\.next/' '\.nuxt/' '\.parcel-cache/' coverage/ '\.nyc_output/' \
             '\.angular/' '\.svelte-kit/' '\.vite/' '\.astro/' '\.gatsby-cache/' \
-            '\.sass-cache/' 'coverage/' 'lerna-debug\.log$' '\.eslintcache$' \
-            'package-lock\.json' 'environments/' \
+            '\.sass-cache/' coverage/ 'lerna-debug\.log$' '\.eslintcache$' \
+            'package-lock\.json' environments/ \
             # Go
-            'go\.mod$' 'go\.sum$' '\.test$' '\.out$' 'vendor/' 'pkg/' 'bin/' \
+            'go\.mod$' 'go\.sum$' '\.test$' '\.out$' vendor/ pkg/ bin/ \
             # Rust
-            'target/' 'Cargo\.lock$' '\.cargo/' '\.rustc/' \
+            target/ 'Cargo\.lock$' '\.cargo/' '\.rustc/' \
             # C# and ASP.NET
-            'obj/' 'bin/' 'publish/' '\.csproj\.user$' '\.suo$' '\.user$' \
-            '\.sln\.docstates$' 'TestResults/' 'packages/' '\.nuget/' '\.pdb$' \
+            obj/ bin/ publish/ '\.csproj\.user$' '\.suo$' '\.user$' \
+            '\.sln\.docstates$' TestResults/ packages/ '\.nuget/' '\.pdb$' \
+            # Python
+            __pycache__/ '.pytest_cache/' '.ropeproject/' '.ruff_cache/' \
             # Miscellaneous build and test artifacts
             '\.min\.js$' '\.map$' '\.coverage$' '\.lcov$' '\.profraw$' \
-            'test-reports/' 'build-artifacts/' 'tmp/' 'temp/' \
+            test-reports/ build-artifacts/ tmp/ temp/ \
             # Database and configuration
             '\.db$' '\.sqlite3$' '\.sql$' '\.bak\.sql$' '\.env\.local$' \
             '\.env\.development$' '\.env\.production$' '\.env'
@@ -121,7 +123,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
 
     function print-file-content
         set -l file $argv[1]
-        set -l ext (string match -r '.*\.([^.]+)$' (basename "$file") | string replace -r '^.*\.' '' | string lower)
+        set -l ext (string match -r '.*\.([^.]+)$' -g (basename "$file") | string replace -r '^.*\.' '' | string lower)
 
         echo ""
         echo "### '$file'"
@@ -172,7 +174,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
         set -l content $argv[1]
         set -l mode $argv[2]
 
-        if test "$mode" = "stdout"
+        if test "$mode" = stdout
             echo "$content"
         else
             echo "$content" | wl-copy
@@ -188,7 +190,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
         return 1
     end
 
-    argparse 'e/exclude=' 'o/output=' 'h/help' 't/no-tree' -- $argv || return 1
+    argparse 'e/exclude=' 'o/output=' h/help t/no-tree -- $argv || return 1
 
     if set -q _flag_help
         echo "usage: code2clip [OPTIONS] <DIRECTORY>"
@@ -216,7 +218,7 @@ function code2clip -d "generate content from directory and copy to clipboard"
     end
 
     set -l exclude (build-exclude-pattern "$_flag_exclude")
-    set -l output_mode "clipboard"
+    set -l output_mode clipboard
     if set -q _flag_output
         set output_mode $_flag_output
     end

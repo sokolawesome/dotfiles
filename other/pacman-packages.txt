@@ -58,6 +58,7 @@ man-db
 micro
 mpv
 mpv-mpris
+ncdu
 neovim
 network-manager-applet
 networkmanager
@@ -67,6 +68,7 @@ npm
 nvidia-open-dkms
 nvidia-utils
 nwg-look
+obsidian
 otf-font-awesome
 pacman-contrib
 pamixer
@@ -78,7 +80,10 @@ pipewire-alsa
 pipewire-jack
 pipewire-pulse
 polkit-kde-agent
+python-dateutil
 python-pip
+python-pytest
+python-pytest-mock
 qbittorrent
 qt6-wayland
 qt6ct
@@ -100,6 +105,7 @@ telegram-desktop
 tree
 tree-sitter-cli
 ttf-cascadia-code-nerd
+ttf-iosevka-nerd
 unzip
 waybar
 wget
