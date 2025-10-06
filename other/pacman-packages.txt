@@ -1,6 +1,5 @@
 7zip
 amd-ucode
-aspnet-runtime-8.0
 base
 base-devel
 bat
@@ -14,7 +13,8 @@ chromium
 cliphist
 delve
 dkms
-dotnet-sdk-8.0
+docker
+docker-compose
 efibootmgr
 eza
 fd
@@ -40,6 +40,7 @@ jq
 just
 kitty
 kvantum
+lazydocker
 lazygit
 lemurs
 less
@@ -81,15 +82,19 @@ pipewire-jack
 pipewire-pulse
 polkit-kde-agent
 python-dateutil
+python-dotenv
+python-flask
 python-pip
+python-pydantic
 python-pytest
 python-pytest-mock
 qbittorrent
 qt6-wayland
 qt6ct
 reflector
+resvg
 ripgrep
-rofi-wayland
+rofi
 ruff
 slurp
 smartmontools

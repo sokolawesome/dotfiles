@@ -1,10 +1,8 @@
 bibata-cursor-git
 catppuccin-gtk-theme-macchiato
-dotnet-sdk-bin
-floorp-bin
 joplin-bin
-omnisharp-roslyn
-python-deezer
+pip-tools
+python-deezer-py
 python-spotipy
 visual-studio-code-bin
 wlogout

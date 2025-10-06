@@ -1,5 +1,6 @@
 # system services
 bluetooth.service
+docker.service
 firewalld.service
 getty@.service
 lemurs.service
@@ -22,7 +23,7 @@ fstrim.timer
 pipewire-pulse.service
 ssh-agent.service
 wireplumber.service
-xdg-user-dirs-update.service
+xdg-user-dirs.service
 gnome-keyring-daemon.socket
 p11-kit-server.socket
 pipewire-pulse.socket

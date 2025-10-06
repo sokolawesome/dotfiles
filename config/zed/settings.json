@@ -1,29 +1,24 @@
 {
     "icon_theme": "Material Icon Theme",
     "ui_font_family": "Noto Sans",
-    "buffer_font_family": "CaskaydiaCove Nerd Font",
+    "buffer_font_family": "Iosevka Nerd Font Mono",
     "ui_font_size": 16,
     "buffer_font_size": 16,
-
     "preferred_line_length": 100,
     "tab_size": 4,
-
     "theme": {
         "mode": "system",
         "light": "Gruvbox Dark Hard",
-        "dark": "Gruvbox Dark Hard"
+        "dark": "Catppuccin Mocha"
     },
-
     "tabs": {
         "file_icons": true,
         "git_status": true
     },
-
     "tab_bar": {
         "show": true,
         "show_nav_history_buttons": false
     },
-
     "project_panel": {
         "indent_size": 16
     }
