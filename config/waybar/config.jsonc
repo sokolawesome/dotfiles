@@ -3,13 +3,7 @@
     "position": "top",
     "height": 30,
     "modules-left": ["hyprland/workspaces", "custom/divider", "custom/media"],
-    "modules-center": [
-        "clock",
-        "custom/divider",
-        "custom/blue-light",
-        "custom/divider",
-        "idle_inhibitor",
-    ],
+    "modules-center": ["clock", "custom/divider", "idle_inhibitor"],
     "modules-right": [
         "pulseaudio",
         "custom/divider",
@@ -45,13 +39,6 @@
     },
     "clock": {
         "format": "{:%H:%M | %d.%m.%Y}",
-        "tooltip": false,
-    },
-    "custom/blue-light": {
-        "format": "{}",
-        "return-type": "json",
-        "exec": "~/bin/hyprland/blue-light.sh status",
-        "interval": 60,
         "tooltip": false,
     },
     "idle_inhibitor": {

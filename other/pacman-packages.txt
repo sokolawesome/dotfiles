@@ -28,7 +28,6 @@ git
 git-delta
 gnome-keyring
 go
-go-task
 golangci-lint
 grim
 gst-plugin-pipewire
@@ -37,7 +36,6 @@ hypridle
 hyprland
 hyprlock
 hyprpicker
-hyprsunset
 jq
 just
 kitty
