@@ -1,7 +1,7 @@
 bibata-cursor-git
 catppuccin-gtk-theme-macchiato
-joplin-bin
-pip-tools
+pop-bin
+proton-community-updater
 python-deezer-py
 python-spotipy
 visual-studio-code-bin
