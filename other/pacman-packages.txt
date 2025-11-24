@@ -10,7 +10,6 @@ blueman
 bluez-utils
 btop
 cava
-chromium
 cliphist
 clojure
 delve
@@ -24,6 +23,7 @@ firewalld
 fish
 fisher
 fzf
+gemini-cli
 git
 git-delta
 gnome-keyring
@@ -34,6 +34,7 @@ gst-plugin-pipewire
 gtk4-layer-shell
 hypridle
 hyprland
+hyprland-qt-support
 hyprlock
 hyprpicker
 jq
@@ -102,6 +103,7 @@ swappy
 swww
 systemd-resolvconf
 tailscale
+teamspeak3
 telegram-desktop
 tree
 tree-sitter-cli
