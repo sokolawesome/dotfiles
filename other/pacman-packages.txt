@@ -5,13 +5,12 @@ base
 base-devel
 bat
 bc
-beets
 blueman
 bluez-utils
 btop
+bun
 cava
 cliphist
-clojure
 delve
 dkms
 docker
@@ -49,7 +48,6 @@ lib32-nvidia-utils
 libnotify
 libpulse
 libva-nvidia-driver
-libvncserver
 linux-firmware
 linux-zen
 linux-zen-headers
@@ -88,10 +86,8 @@ qbittorrent
 qt6-wayland
 qt6ct
 reflector
-remmina
 resvg
 ripgrep
-rlwrap
 rofi
 slurp
 smartmontools
@@ -103,7 +99,6 @@ swappy
 swww
 systemd-resolvconf
 tailscale
-teamspeak3
 telegram-desktop
 tree
 tree-sitter-cli
