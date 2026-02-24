@@ -24,8 +24,8 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
                 (.id | tostring),
                 .type,
                 (.properties.language_ietf // .properties.language // "und"),
-                (.properties.track_name // "")
-            ] | join("\t")
+                ((.properties.track_name // "") | gsub("[|]"; "/"))
+            ] | join("|")
         '
     end
 
@@ -34,25 +34,19 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         set -l type $argv[2]
         set -l lang $argv[3]
         set -l name $argv[4]
-        set -l positions (string split ',' $argv[5])
+        set -l target_pos $argv[5]
 
         set -l all_matches (mkvmerge -J "$file" 2>/dev/null | jq -r --arg type "$type" --arg lang "$lang" --arg name "$name" '
             .tracks[] |
             select(.type == $type) |
             select((.properties.language_ietf // .properties.language // "und") == $lang) |
-            select($name == "" or (.properties.track_name // "") == $name) |
+            select($name == "" or ((.properties.track_name // "") | gsub("[|]"; "/")) == $name) |
             .id | tostring
         ')
 
-        set -l result
-        for pos in $positions
-            set -l idx (math "$pos + 1")
-            set -l match (echo $all_matches | string split ' ' | sed -n "$idx"p)
-            if test -n "$match"
-                set -a result $match
-            end
-        end
-        echo $result
+        set -l matches (string split '\n' $all_matches)
+        set -l idx (math "$target_pos + 1")
+        echo $matches[$idx]
     end
 
     function scan-files
@@ -170,35 +164,45 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         return 1
     end
 
-    function build-specs
-        set -l selected $argv
-        set -l specs
-        for t in $selected
-            set -l parts (string split '|' "$t")
-            set -l type $parts[2]
-            set -l lang $parts[3]
-            set -l name $parts[4]
-            set -l probe_id $parts[1]
-
-            set -l pos 0
-            set -l found_pos 0
-            for candidate in $tracks
-                set -l cp (string split '|' "$candidate")
-                if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[4]" = "$name"
-                    if test "$cp[1]" = "$probe_id"
-                        set found_pos $pos
-                        break
-                    end
-                    set pos (math $pos + 1)
+    set -l audio_specs
+    for t in $keep_audio
+        set -l parts (string split '|' "$t")
+        set -l type $parts[2]
+        set -l lang $parts[3]
+        set -l name $parts[4]
+        set -l probe_id $parts[1]
+        set -l pos 0
+        for candidate in $tracks
+            set -l cp (string split '|' "$candidate")
+            if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[4]" = "$name"
+                if test "$cp[1]" = "$probe_id"
+                    break
                 end
+                set pos (math $pos + 1)
             end
-            set -a specs "$type|$lang|$name|$found_pos"
         end
-        echo $specs
+        set -a audio_specs "$type|$lang|$name|$pos"
     end
 
-    set -l audio_specs (build-specs $keep_audio)
-    set -l sub_specs (build-specs $keep_subs)
+    set -l sub_specs
+    for t in $keep_subs
+        set -l parts (string split '|' "$t")
+        set -l type $parts[2]
+        set -l lang $parts[3]
+        set -l name $parts[4]
+        set -l probe_id $parts[1]
+        set -l pos 0
+        for candidate in $tracks
+            set -l cp (string split '|' "$candidate")
+            if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[4]" = "$name"
+                if test "$cp[1]" = "$probe_id"
+                    break
+                end
+                set pos (math $pos + 1)
+            end
+        end
+        set -a sub_specs "$type|$lang|$name|$pos"
+    end
 
     echo ""
     echo "will keep:"
@@ -361,6 +365,6 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     printf "  after:  %s\n" (format-size $size_after)
     printf "  saved:  %s\n" (format-size $saved)
     set -l time_end (date +%s)
-    set -l elapsed (math "$time_end - $time_start")
+    set -l elapsed (math -s 0 "$time_end - $time_start")
     printf "  time:   %dm %ds\n" (math "$elapsed / 60") (math "$elapsed % 60")
 end
