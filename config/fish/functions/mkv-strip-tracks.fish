@@ -10,6 +10,10 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
             echo "error: jq not found - install with 'sudo pacman -S jq'"
             return 1
         end
+        if not command -q stdbuf
+            echo "error: stdbuf not found - install with 'sudo pacman -S coreutils'"
+            return 1
+        end
     end
 
     function scan-tracks
@@ -21,34 +25,34 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
                 .type,
                 (.properties.language_ietf // .properties.language // "und"),
                 (.properties.track_name // "")
-            ] | join("|")
+            ] | join("\t")
         '
     end
 
-    function find-track-id
+    function find-track-ids-by-spec
         set -l file $argv[1]
         set -l type $argv[2]
         set -l lang $argv[3]
         set -l name $argv[4]
+        set -l positions (string split ',' $argv[5])
 
-        set -l match (mkvmerge -J "$file" 2>/dev/null | jq -r --arg type "$type" --arg lang "$lang" --arg name "$name" '
+        set -l all_matches (mkvmerge -J "$file" 2>/dev/null | jq -r --arg type "$type" --arg lang "$lang" --arg name "$name" '
             .tracks[] |
             select(.type == $type) |
             select((.properties.language_ietf // .properties.language // "und") == $lang) |
             select($name == "" or (.properties.track_name // "") == $name) |
             .id | tostring
-        ' | head -1)
+        ')
 
-        if test -z "$match"
-            set match (mkvmerge -J "$file" 2>/dev/null | jq -r --arg type "$type" --arg lang "$lang" '
-                .tracks[] |
-                select(.type == $type) |
-                select((.properties.language_ietf // .properties.language // "und") == $lang) |
-                .id | tostring
-            ' | head -1)
+        set -l result
+        for pos in $positions
+            set -l idx (math "$pos + 1")
+            set -l match (echo $all_matches | string split ' ' | sed -n "$idx"p)
+            if test -n "$match"
+                set -a result $match
+            end
         end
-
-        echo "$match"
+        echo $result
     end
 
     function scan-files
@@ -156,6 +160,36 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         return 1
     end
 
+    function build-specs
+        set -l selected $argv
+        set -l specs
+        for t in $selected
+            set -l parts (string split '|' "$t")
+            set -l type $parts[2]
+            set -l lang $parts[3]
+            set -l name $parts[4]
+            set -l probe_id $parts[1]
+
+            set -l pos 0
+            set -l found_pos 0
+            for candidate in $tracks
+                set -l cp (string split '|' "$candidate")
+                if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[4]" = "$name"
+                    if test "$cp[1]" = "$probe_id"
+                        set found_pos $pos
+                        break
+                    end
+                    set pos (math $pos + 1)
+                end
+            end
+            set -a specs "$type|$lang|$name|$found_pos"
+        end
+        echo $specs
+    end
+
+    set -l audio_specs (build-specs $keep_audio)
+    set -l sub_specs (build-specs $keep_subs)
+
     echo ""
     echo "will keep:"
     echo "  video: all"
@@ -174,24 +208,25 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     set -l files_ok
     set -l files_missing
     set -l missing_report
+    set -l time_start (date +%s)
 
     for f in $files
         set -l base (basename "$f")
         set -l missing
 
-        for t in $keep_audio
-            set -l parts (string split '|' "$t")
-            set -l id (find-track-id "$f" audio $parts[3] $parts[4])
-            if test -z "$id"
-                set -a missing "audio lang=$parts[3] $parts[4]"
+        for spec in $audio_specs
+            set -l sp (string split '|' "$spec")
+            set -l ids (find-track-ids-by-spec "$f" $sp[1] $sp[2] $sp[3] $sp[4])
+            if test -z "$ids"
+                set -a missing "audio lang=$sp[2] $sp[3]"
             end
         end
 
-        for t in $keep_subs
-            set -l parts (string split '|' "$t")
-            set -l id (find-track-id "$f" subtitles $parts[3] $parts[4])
-            if test -z "$id"
-                set -a missing "subtitle lang=$parts[3] $parts[4]"
+        for spec in $sub_specs
+            set -l sp (string split '|' "$spec")
+            set -l ids (find-track-ids-by-spec "$f" $sp[1] $sp[2] $sp[3] $sp[4])
+            if test -z "$ids"
+                set -a missing "subtitle lang=$sp[2] $sp[3]"
             end
         end
 
@@ -209,7 +244,6 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         for r in $missing_report
             echo "  $r"
         end
-
         echo ""
         echo "  [1] skip those files, process the rest"
         echo "  [2] process anyway (missing tracks simply won't be included)"
@@ -236,7 +270,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     set -l size_before (sum-size $files)
 
     echo ""
-    printf "  %d files will be processed"
+    printf "  %d files will be processed\n" (count $files)
     echo ""
 
     read -l -P "proceed? [y/N] " confirm
@@ -252,19 +286,19 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         set -l temp (string replace -r '\.mkv$' '_strip_temp.mkv' "$f")
 
         set -l audio_ids
-        for t in $keep_audio
-            set -l parts (string split '|' "$t")
-            set -l id (find-track-id "$f" audio $parts[3] $parts[4])
-            if test -n "$id"
+        for spec in $audio_specs
+            set -l sp (string split '|' "$spec")
+            set -l ids (find-track-ids-by-spec "$f" $sp[1] $sp[2] $sp[3] $sp[4])
+            for id in $ids
                 set -a audio_ids $id
             end
         end
 
         set -l sub_ids
-        for t in $keep_subs
-            set -l parts (string split '|' "$t")
-            set -l id (find-track-id "$f" subtitles $parts[3] $parts[4])
-            if test -n "$id"
+        for spec in $sub_specs
+            set -l sp (string split '|' "$spec")
+            set -l ids (find-track-ids-by-spec "$f" $sp[1] $sp[2] $sp[3] $sp[4])
+            for id in $ids
                 set -a sub_ids $id
             end
         end
@@ -285,13 +319,20 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
 
         set -a cmd "$f"
 
-        printf "  processing: %s ... " "$base"
-        if $cmd > /dev/null 2>&1
+        printf "  %-60s" "$base"
+        set -l ok true
+        stdbuf -oL $cmd 2>/dev/null | stdbuf -oL tr '\r' '\n' | while read -l line
+            if string match -qr 'Progress: ([0-9]+)%' "$line"
+                set -l pct (string match -r 'Progress: ([0-9]+)%' "$line")[2]
+                printf "\r  %-60s %3s%%" "$base" "$pct"
+            end
+        end
+        if test $pipestatus[1] -eq 0 -a "$ok" = true
             mv "$temp" "$f"
-            echo "done"
+            printf "\r  %-60s done\n" "$base"
         else
             rm -f "$temp"
-            echo "error"
+            printf "\r  %-60s error\n" "$base"
             set errors (math $errors + 1)
         end
     end
@@ -309,4 +350,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     printf "  before: %s\n" (format-size $size_before)
     printf "  after:  %s\n" (format-size $size_after)
     printf "  saved:  %s\n" (format-size $saved)
+    set -l time_end (date +%s)
+    set -l elapsed (math "$time_end - $time_start")
+    printf "  time:   %dm %ds\n" (math "$elapsed / 60") (math "$elapsed % 60")
 end
