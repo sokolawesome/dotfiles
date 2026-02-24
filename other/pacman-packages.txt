@@ -1,5 +1,4 @@
 7zip
-abiword
 amd-ucode
 base
 base-devel
@@ -15,8 +14,10 @@ delve
 dkms
 docker
 docker-compose
+dosfstools
 efibootmgr
 eza
+fastfetch
 fd
 firewalld
 fish
@@ -82,6 +83,7 @@ pipewire-jack
 pipewire-pulse
 polkit-kde-agent
 poppler
+poppler-data
 qbittorrent
 qt6-wayland
 qt6ct

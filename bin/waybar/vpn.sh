@@ -14,36 +14,18 @@ function validate-environment
 
 function get-vpn-status
 {
-    if pgrep -f "outline-cli" >/dev/null
+    if tailscale status | grep "offers exit node"
     then
-        echo "running"
+        echo "stopped"
         return 0
     else
-        echo "stopped"
+        echo "running"
         return 1
     fi
 }
 
 function start-vpn
 {
-    local vpn_log_file="${VPN_LOG_FILE:-/dev/null}"
-
-    if [ -z "$OUTLINE_VPN_URL" ]
-    then
-        if command -v zenity >/dev/null 2>&1
-        then
-            OUTLINE_VPN_URL=$(zenity --entry --title="VPN Setup" --text="Enter Outline VPN URL:")
-            if [ -z "$OUTLINE_VPN_URL" ]
-            then
-                echo "error: no VPN URL provided"
-                return 1
-            fi
-        else
-            echo "error: OUTLINE_VPN_URL not set and zenity not installed. install it with 'sudo pacman -S zenity'."
-            return 1
-        fi
-    fi
-
     if [ "$(get-vpn-status)" = "running" ]
     then
         echo "error: VPN is already running"
@@ -51,8 +33,8 @@ function start-vpn
     fi
 
     echo "starting VPN..."
-    pkexec --disable-internal-agent env OUTLINE_VPN_URL="$OUTLINE_VPN_URL" VPN_LOG_FILE="$vpn_log_file" bash -c \
-        "go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-cli@latest -transport \"$OUTLINE_VPN_URL\" > \"$vpn_log_file\" 2>&1 &"
+    pkexec --disable-internal-agent bash -c \
+        "tailscale set --exit-node=100.87.8.77"
 
     local auth_result=$?
     if [ $auth_result -eq 126 ]
@@ -87,7 +69,7 @@ function stop-vpn
 
     echo "stopping VPN..."
     pkexec --disable-internal-agent bash -c \
-        "pkill -f 'outline-cli'; sleep 1; pkill -9 -f 'outline-cli' 2>/dev/null"
+        "tailscale set --exit-node="
 
     local auth_result=$?
     if [ $auth_result -eq 126 ]

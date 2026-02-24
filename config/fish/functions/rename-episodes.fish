@@ -1,171 +1,146 @@
-function rename-episodes -d "bulk rename tv show episodes with proper season/episode format"
-    function detect-season-from-directory
-        set -l current_dir (basename "$PWD")
+function rename-episodes -d "bulk rename tv show episodes with proper S01E01 format"
 
-        if string match -qr 'Season ([0-9]+)' "$current_dir"
-            set -l season_match (string match -r 'Season ([0-9]+)' "$current_dir")
-            printf "%02d" $season_match[2]
+    function _re_detect_season
+        set -l dir (basename "$PWD")
+        if string match -qr '(?i)season[\s._-]*([0-9]+)' "$dir"
+            printf "%02d" (string match -r '(?i)season[\s._-]*([0-9]+)' "$dir")[2]
             return 0
         end
-
         return 1
     end
 
-    function get-video-files
-        find . -maxdepth 1 -type f \( -name "*.mkv" -o -name "*.mka" -o -name "*.mp4" -o -name "*.avi" \) | sort
-    end
-
-    function get-subtitle-files
-        find . -maxdepth 1 -type f \( -name "*.ass" -o -name "*.srt" -o -name "*.vtt" \) | sort
-    end
-
-    function extract-episode-number
-        set -l filename $argv[1]
-
-        set -l patterns \
-            'S[0-9]+E([0-9]+)' \
-            '\[([0-9]+)\]' \
-            ' ([0-9]+) ' \
-            '-([0-9]+)-' \
-            '_([0-9]+)_' \
-            '\.([0-9]+)\.' \
-            ' ([0-9]+)\.' \
-            '^([0-9]+)' \
-            '([0-9]+)$'
-
-        for pattern in $patterns
-            if string match -qr "$pattern" "$filename"
-                set -l match (string match -r "$pattern" "$filename")
-                if test -n "$match[2]"
-                    echo "$match[2]"
-                    return 0
-                end
-            end
-        end
-
-        return 1
-    end
-
-    function group-files-by-episode
-        set -l files $argv[1..]
-        set -l grouped_files
-
-        for file in $files
-            set -l basename_file (basename "$file")
-            set -l episode_num (extract-episode-number "$basename_file")
-
-            if test -n "$episode_num"
-                # Convert to decimal to avoid octal issues, then pad
-                set -l decimal_episode (printf "%d" "$episode_num" 2>/dev/null || echo "$episode_num")
-                set -l padded_episode (printf "%02d" "$decimal_episode")
-                set -a grouped_files "$decimal_episode:$file"
-            else
-                echo "warning: could not extract episode number from '$basename_file'"
-            end
-        end
-
-        printf '%s\n' $grouped_files | sort -n -t: -k1,1
-    end
-
-    function calculate-new-episode-number
-        set -l current_episode $argv[1]
-        set -l episode_offset $argv[2]
-
-        # Convert to decimal to avoid octal interpretation issues
-        set -l current_decimal (printf "%d" "$current_episode" 2>/dev/null || echo "$current_episode")
-        set -l offset_decimal (printf "%d" "$episode_offset" 2>/dev/null || echo "$episode_offset")
-
-        math "$current_decimal + $offset_decimal"
-    end
-
-    function generate-new-filename
-        set -l old_file $argv[1]
-        set -l season $argv[2]
-        set -l new_episode $argv[3]
-
-        set -l extension (string match -r '\\.[^.]+\\.[^.]+\\.[^.]+|\\.[^.]+\\.[^.]+|\\.[^.]+$' (string sub -s 3 "$old_file"))
-        set -l new_episode_padded (printf "%02d" "$new_episode")
-
-        echo "S"$season"E$new_episode_padded$extension"
-    end
-
-    function preview-renames
-        set -l season $argv[1]
-        set -l episode_offset $argv[2]
-        set -l grouped_files $argv[3..]
-
-        echo "preview of changes:"
-        echo -------------------
-
-        for entry in $grouped_files
-            set -l parts (string split ':' "$entry")
-            set -l episode_num $parts[1]
-            set -l file_path $parts[2]
-            set -l old_filename (basename "$file_path")
-
-            set -l new_episode (calculate-new-episode-number "$episode_num" "$episode_offset")
-            set -l new_filename (generate-new-filename "$file_path" "$season" "$new_episode")
-
-            echo "$old_filename -> $new_filename"
-        end
-
-        echo -------------------
-        echo "total files: "(count $grouped_files)
-    end
-
-    function execute-renames
-        set -l season $argv[1]
-        set -l episode_offset $argv[2]
-        set -l grouped_files $argv[3..]
-
-        for entry in $grouped_files
-            set -l parts (string split ':' "$entry")
-            set -l episode_num $parts[1]
-            set -l file_path $parts[2]
-            set -l old_filename (basename "$file_path")
-
-            set -l new_episode (calculate-new-episode-number "$episode_num" "$episode_offset")
-            set -l new_filename (generate-new-filename "$file_path" "$season" "$new_episode")
-
-            echo "renaming: $old_filename -> $new_filename"
-            mv "$file_path" "$new_filename" || begin
-                echo "error: failed to rename $old_filename"
-                return 1
-            end
-        end
-    end
-
-    function prompt-confirmation
-        echo ""
-        echo "proceed with renaming? [y/N]: "
-        read -l response
-
-        if test "$response" = y -o "$response" = Y
-            return 0
+    function _re_normalize_dots
+        set -l name $argv[1]
+        if not string match -q '* *' "$name"
+            echo (string replace -ar '\.' ' ' "$name")
         else
-            echo "operation cancelled"
+            echo "$name"
+        end
+    end
+
+    function _re_extract_episode
+        set -l raw $argv[1]
+        set -l name (string replace -r '\.[^.]+$' '' "$raw")
+        set -l normalized (_re_normalize_dots "$name")
+
+        if string match -qr '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized"
+            set -l m (string match -r '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized")
+            printf "%02d:%02d" $m[2] $m[3]
+            return 0
+        end
+
+        if string match -qr '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name"
+            set -l m (string match -r '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name")
+            printf "%02d:%02d" $m[2] $m[3]
+            return 0
+        end
+
+        if string match -qr '([0-9]{1,2})x([0-9]{1,3})' "$normalized"
+            set -l m (string match -r '([0-9]{1,2})x([0-9]{1,3})' "$normalized")
+            printf "%02d:%02d" $m[2] $m[3]
+            return 0
+        end
+
+        if string match -qr '\[([0-9]{1,3})\]' "$name"
+            set -l m (string match -r '\[([0-9]{1,3})\]' "$name")
+            printf "00:%02d" $m[2]
+            return 0
+        end
+
+        if string match -qr ' - ([0-9]{1,3})[ .]' "$name"
+            set -l m (string match -r ' - ([0-9]{1,3})[ .]' "$name")
+            printf "00:%02d" $m[2]
+            return 0
+        end
+
+        if string match -qr '[ -]([0-9]{1,3})$' "$name"
+            set -l m (string match -r '[ -]([0-9]{1,3})$' "$name")
+            printf "00:%02d" $m[2]
+            return 0
+        end
+
+        if string match -qr '^([0-9]{1,3})[\. ]' "$name"
+            set -l m (string match -r '^([0-9]{1,3})[\. ]' "$name")
+            printf "00:%02d" $m[2]
+            return 0
+        end
+
+        return 1
+    end
+
+    function _re_extract_ext
+        set -l name $argv[1]
+        set -l known_langs eng rus jpn chi kor fre ger spa ita por ara pol ukr tur vie en ru jp fr de
+        set -l known_exts mkv mp4 avi mka ac3 eac3 flac aac ass srt vtt sub
+        set -l parts (string split '.' "$name")
+        set -l n (count $parts)
+
+        if test $n -lt 2
             return 1
         end
+
+        set -l ext_parts
+        set -l i $n
+
+        if not contains -- $parts[$i] $known_exts
+            return 1
+        end
+        set -p ext_parts $parts[$i]
+        set i (math "$i - 1")
+
+        if test $i -ge 2
+            set -l candidate $parts[$i]
+            if not contains -- $candidate $known_langs
+                and not string match -qr '^[0-9]+$' "$candidate"
+                and not contains -- $candidate $known_exts
+                and not string match -q '* *' "$candidate"
+                and test (string length "$candidate") -le 20
+                set -p ext_parts $candidate
+                set i (math "$i - 1")
+            end
+        end
+
+        if test $i -ge 2
+            set -l candidate $parts[$i]
+            if contains -- $candidate $known_langs
+                set -p ext_parts $candidate
+            end
+        end
+
+        echo "."(string join '.' $ext_parts)
     end
 
-    argparse 's/season=' 'o/offset=' n/dry-run h/help -- $argv || return 1
+    function _re_new_name
+        set -l season $argv[1]
+        set -l episode $argv[2]
+        set -l orig_base $argv[3]
+        set -l ext (_re_extract_ext "$orig_base")
+        echo "S"$season"E"$episode$ext
+    end
+
+    function _re_scan_files
+        find . -maxdepth 1 -type f \( \
+            -name "*.mkv" -o -name "*.mp4" -o -name "*.avi" \
+            -o -name "*.mka" -o -name "*.ac3" -o -name "*.eac3" \
+            -o -name "*.flac" -o -name "*.aac" \
+            -o -name "*.ass" -o -name "*.srt" -o -name "*.vtt" -o -name "*.sub" \
+        \) | sort
+    end
+
+    argparse 's/season=' 'o/offset=' 'h/help' -- $argv
+    or return 1
 
     if set -q _flag_help
-        echo "usage: rename-episodes [-s SEASON] [-o OFFSET] [-n]"
-        echo ""
-        echo "bulk rename tv show episodes with proper season/episode format"
+        echo "usage: rename-episodes [-s SEASON] [-o OFFSET]"
         echo ""
         echo "options:"
-        echo "  -s, --season SEASON  season number (auto-detect from directory if not provided)"
-        echo "  -o, --offset OFFSET  episode number offset (default: 0)"
-        echo "  -n, --dry-run        preview changes without executing"
-        echo "  -h, --help           show this help message"
+        echo "  -s, --season N    season number (auto-detected from directory name)"
+        echo "  -o, --offset N    add N to every episode number (default: 0)"
         echo ""
         echo "examples:"
-        echo "  rename-episodes                    # auto-detect season, no offset"
-        echo "  rename-episodes -s 2               # force season 2"
-        echo "  rename-episodes -s 2 -o 12         # season 2, episodes start from 13"
-        echo "  rename-episodes -n                 # preview only"
+        echo "  rename-episodes"
+        echo "  rename-episodes -s 2"
+        echo "  rename-episodes -s 1 -o 12"
         return 0
     end
 
@@ -173,55 +148,115 @@ function rename-episodes -d "bulk rename tv show episodes with proper season/epi
     if set -q _flag_season
         set season (printf "%02d" "$_flag_season")
     else
-        set season (detect-season-from-directory)
+        set season (_re_detect_season)
         if test $status -ne 0
-            echo "error: could not detect season from directory name"
-            echo "use -s/--season to specify season number"
+            echo "error: could not detect season from directory name '(basename $PWD)'"
+            echo "       use -s/--season to specify"
             return 1
         end
-        echo "detected season: $season"
+        echo "detected season $season from directory name"
     end
 
-    set -l episode_offset 0
+    set -l offset 0
     if set -q _flag_offset
-        set episode_offset "$_flag_offset"
+        set offset (math (printf "%d" "$_flag_offset"))
     end
 
-    set -l video_files (get-video-files)
-    set -l subtitle_files (get-subtitle-files)
-    set -l all_files $video_files $subtitle_files
-
-    if test (count $all_files) -eq 0
-        echo "error: no video or subtitle files found in current directory"
+    set -l files (_re_scan_files)
+    if test (count $files) -eq 0
+        echo "error: no media files found in current directory"
         return 1
     end
 
-    set -l grouped_files (group-files-by-episode $all_files)
-    if test (count $grouped_files) -eq 0
+    set -l entries
+    set -l skipped
+
+    for f in $files
+        set -l base (basename "$f")
+        set -l parsed (_re_extract_episode "$base")
+        if test $status -eq 0
+            set -l parts (string split ':' "$parsed")
+            set -l ep_season $parts[1]
+            set -l ep_num $parts[2]
+
+            if test $offset -ne 0
+                set ep_num (printf "%02d" (math (printf "%d" "$ep_num") + $offset))
+            end
+
+            if test "$ep_season" = "00"
+                set ep_season "$season"
+            end
+
+            set -a entries "$ep_season:$ep_num:$f"
+        else
+            set -a skipped "$base"
+        end
+    end
+
+    if test (count $entries) -eq 0
         echo "error: could not extract episode numbers from any files"
         return 1
     end
 
-    set -l dry_run false
-    if set -q _flag_dry_run
-        set dry_run true
+    echo ""
+    echo "preview:"
+    echo "────────────────────────────────────────────────────────────────"
+
+    for entry in (printf '%s\n' $entries | sort -t: -k1,1 -k2,2)
+        set -l parts (string split ':' "$entry")
+        set -l ep_season $parts[1]
+        set -l ep_num $parts[2]
+        set -l fpath $parts[3]
+        set -l base (basename "$fpath")
+        set -l newname (_re_new_name "$ep_season" "$ep_num" "$base")
+        printf "  %-55s → %s\n" "$base" "$newname"
     end
 
-    preview-renames "$season" "$episode_offset" $grouped_files
-
-    if test "$dry_run" = true
+    if test (count $skipped) -gt 0
         echo ""
-        echo "dry run complete - no files were renamed"
-        return 0
+        echo "skipped:"
+        for s in $skipped
+            echo "  $s"
+        end
     end
 
-    if not prompt-confirmation
+    echo "────────────────────────────────────────────────────────────────"
+    printf "  %d files" (count $entries)
+    if test (count $skipped) -gt 0
+        printf ", %d skipped" (count $skipped)
+    end
+    echo ""
+    echo ""
+
+    read -l -P "proceed? [y/N] " confirm
+    if not string match -qi 'y' "$confirm"
+        echo "cancelled"
         return 1
     end
 
-    execute-renames "$season" "$episode_offset" $grouped_files
-    if test $status -eq 0
-        echo ""
-        echo "episode renaming completed successfully!"
+    set -l errors 0
+
+    for entry in (printf '%s\n' $entries | sort -t: -k1,1 -k2,2)
+        set -l parts (string split ':' "$entry")
+        set -l ep_season $parts[1]
+        set -l ep_num $parts[2]
+        set -l fpath $parts[3]
+        set -l base (basename "$fpath")
+        set -l dir (dirname "$fpath")
+        set -l newname (_re_new_name "$ep_season" "$ep_num" "$base")
+
+        if mv "$fpath" "$dir/$newname"
+            echo "  $base → $newname"
+        else
+            echo "  error: failed to rename $base"
+            set errors (math $errors + 1)
+        end
+    end
+
+    echo ""
+    if test $errors -eq 0
+        echo "done — "(count $entries)" files renamed"
+    else
+        echo "done with $errors error(s)"
     end
 end
