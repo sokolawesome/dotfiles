@@ -56,7 +56,17 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     end
 
     function scan-files
-        find . -maxdepth 1 -name "*.mkv" | sort
+        if test (count $argv) -gt 0
+            for f in $argv
+                if test -f "$f" -a (string match -q '*.mkv' "$f"; echo $status) -eq 0
+                    echo "$f"
+                else
+                    echo "error: $f is not a valid .mkv file" >&2
+                end
+            end
+        else
+            find . -maxdepth 1 -name "*.mkv" | sort
+        end
     end
 
     function sum-size
@@ -85,7 +95,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         return 1
     end
 
-    set -l files (scan-files)
+    set -l files (scan-files $argv)
     if test (count $files) -eq 0
         echo "error: no .mkv files found in current directory"
         return 1
