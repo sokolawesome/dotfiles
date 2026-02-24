@@ -222,7 +222,6 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     set -l files_ok
     set -l files_missing
     set -l missing_report
-    set -l time_start (date +%s)
 
     for f in $files
         set -l base (basename "$f")
@@ -294,6 +293,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     end
 
     set -l errors 0
+    set -l time_start (date +%s | string replace -r '\..+' '')
 
     for f in $files
         set -l base (basename "$f")
@@ -364,7 +364,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     printf "  before: %s\n" (format-size $size_before)
     printf "  after:  %s\n" (format-size $size_after)
     printf "  saved:  %s\n" (format-size $saved)
-    set -l time_end (date +%s)
+    set -l time_end (date +%s | string replace -r '\..+' '')
     set -l elapsed (math -s 0 "$time_end - $time_start")
-    printf "  time:   %dm %ds\n" (math "$elapsed / 60") (math "$elapsed % 60")
+    printf "  time:   %dm %ds\n" (math -s 0 "$elapsed / 60") (math -s 0 "$elapsed % 60")
 end
