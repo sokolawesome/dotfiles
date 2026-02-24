@@ -23,45 +23,51 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
         set -l name (string replace -r '\.[^.]+$' '' "$raw")
         set -l normalized (_re_normalize_dots "$name")
 
+        function _re_pad
+            set -l n (string replace -r '^0*' '' "$argv[1]")
+            test -z "$n" && set n 0
+            printf "%02d" $n
+        end
+
         if string match -qr '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized"
             set -l m (string match -r '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized")
-            printf "%02d:%02d" $m[2] $m[3]
+            printf "%s:%s" (_re_pad $m[2]) (_re_pad $m[3])
             return 0
         end
 
         if string match -qr '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name"
             set -l m (string match -r '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name")
-            printf "%02d:%02d" $m[2] $m[3]
+            printf "%s:%s" (_re_pad $m[2]) (_re_pad $m[3])
             return 0
         end
 
         if string match -qr '([0-9]{1,2})x([0-9]{1,3})' "$normalized"
             set -l m (string match -r '([0-9]{1,2})x([0-9]{1,3})' "$normalized")
-            printf "%02d:%02d" $m[2] $m[3]
+            printf "%s:%s" (_re_pad $m[2]) (_re_pad $m[3])
             return 0
         end
 
         if string match -qr '\[([0-9]{1,3})\]' "$name"
             set -l m (string match -r '\[([0-9]{1,3})\]' "$name")
-            printf "00:%02d" $m[2]
+            printf "00:%s" (_re_pad $m[2])
             return 0
         end
 
         if string match -qr ' - ([0-9]{1,3})[ .]' "$name"
             set -l m (string match -r ' - ([0-9]{1,3})[ .]' "$name")
-            printf "00:%02d" $m[2]
+            printf "00:%s" (_re_pad $m[2])
             return 0
         end
 
         if string match -qr '[ -]([0-9]{1,3})$' "$name"
             set -l m (string match -r '[ -]([0-9]{1,3})$' "$name")
-            printf "00:%02d" $m[2]
+            printf "00:%s" (_re_pad $m[2])
             return 0
         end
 
         if string match -qr '^([0-9]{1,3})[\. ]' "$name"
             set -l m (string match -r '^([0-9]{1,3})[\. ]' "$name")
-            printf "00:%02d" $m[2]
+            printf "00:%s" (_re_pad $m[2])
             return 0
         end
 
@@ -71,7 +77,9 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
     function _re_extract_ext
         set -l name $argv[1]
         set -l known_langs eng rus jpn chi kor fre ger spa ita por ara pol ukr tur vie en ru jp fr de
-        set -l known_exts mkv mp4 avi mka ac3 eac3 flac aac ass srt vtt sub
+        set -l video_exts mkv mp4 avi
+        set -l audio_exts mka ac3 eac3 flac aac
+        set -l sub_exts ass srt vtt sub
         set -l parts (string split '.' "$name")
         set -l n (count $parts)
 
@@ -79,35 +87,58 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
             return 1
         end
 
-        set -l ext_parts
-        set -l i $n
+        set -l last $parts[$n]
 
-        if not contains -- $parts[$i] $known_exts
-            return 1
+        if contains -- $last $video_exts
+            echo ".$last"
+            return 0
         end
-        set -p ext_parts $parts[$i]
-        set i (math "$i - 1")
 
-        if test $i -ge 2
-            set -l candidate $parts[$i]
-            if not contains -- $candidate $known_langs
-                and not string match -qr '^[0-9]+$' "$candidate"
-                and not contains -- $candidate $known_exts
-                and not string match -q '* *' "$candidate"
-                and test (string length "$candidate") -le 20
-                set -p ext_parts $candidate
-                set i (math "$i - 1")
+        if contains -- $last $audio_exts
+            set -l ext_parts $last
+            set -l i (math "$n - 1")
+            if test $i -ge 2
+                set -l candidate $parts[$i]
+                if not contains -- $candidate $known_langs
+                    and not string match -qr '^[0-9]+$' "$candidate"
+                    and not string match -q '* *' "$candidate"
+                    and test (string length "$candidate") -le 20
+                    set -p ext_parts $candidate
+                    set i (math "$i - 1")
+                end
             end
-        end
-
-        if test $i -ge 2
-            set -l candidate $parts[$i]
-            if contains -- $candidate $known_langs
-                set -p ext_parts $candidate
+            if test $i -ge 2
+                if contains -- $parts[$i] $known_langs
+                    set -p ext_parts $parts[$i]
+                end
             end
+            echo "."(string join '.' $ext_parts)
+            return 0
         end
 
-        echo "."(string join '.' $ext_parts)
+        if contains -- $last $sub_exts
+            set -l ext_parts $last
+            set -l i (math "$n - 1")
+            if test $i -ge 2
+                set -l candidate $parts[$i]
+                if not contains -- $candidate $known_langs
+                    and not string match -qr '^[0-9]+$' "$candidate"
+                    and not string match -q '* *' "$candidate"
+                    and test (string length "$candidate") -le 20
+                    set -p ext_parts $candidate
+                    set i (math "$i - 1")
+                end
+            end
+            if test $i -ge 2
+                if contains -- $parts[$i] $known_langs
+                    set -p ext_parts $parts[$i]
+                end
+            end
+            echo "."(string join '.' $ext_parts)
+            return 0
+        end
+
+        return 1
     end
 
     function _re_new_name
@@ -180,7 +211,9 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
             set -l ep_num $parts[2]
 
             if test $offset -ne 0
-                set ep_num (printf "%02d" (math (printf "%d" "$ep_num") + $offset))
+                set -l ep_num_decimal (string replace -r '^0*' '' "$ep_num")
+                test -z "$ep_num_decimal" && set ep_num_decimal 0
+                set ep_num (printf "%02d" (math "$ep_num_decimal + $offset"))
             end
 
             if test "$ep_season" = "00"
@@ -255,7 +288,7 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
 
     echo ""
     if test $errors -eq 0
-        echo "done — "(count $entries)" files renamed"
+        echo "done - "(count $entries)" files renamed"
     else
         echo "done with $errors error(s)"
     end

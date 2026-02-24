@@ -1,6 +1,18 @@
 function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV files"
 
-    function _mst_scan_tracks
+    function validate-environment
+        if not command -q mkvmerge
+            echo "error: mkvmerge not found - install with 'sudo pacman -S mkvtoolnix-cli'"
+            return 1
+        end
+
+        if not command -q jq
+            echo "error: jq not found - install with 'sudo pacman -S jq'"
+            return 1
+        end
+    end
+
+    function scan-tracks
         set -l file $argv[1]
         mkvmerge -J "$file" 2>/dev/null | jq -r '
             .tracks[] |
@@ -13,7 +25,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         '
     end
 
-    function _mst_find_track_id
+    function find-track-id
         set -l file $argv[1]
         set -l type $argv[2]
         set -l lang $argv[3]
@@ -39,21 +51,37 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         echo "$match"
     end
 
-    function _mst_scan_files
+    function scan-files
         find . -maxdepth 1 -name "*.mkv" | sort
     end
 
-    if not command -q mkvmerge
-        echo "error: mkvmerge not found — install mkvtoolnix"
+    function sum-size
+        set -l total 0
+        for f in $argv
+            set -l s (stat -c %s "$f" 2>/dev/null)
+            if test -n "$s"
+                set total (math "$total + $s")
+            end
+        end
+        echo $total
+    end
+
+    function format-size
+        set -l bytes $argv[1]
+        if test $bytes -ge 1073741824
+            printf "%.2f GiB" (math "$bytes / 1073741824")
+        else if test $bytes -ge 1048576
+            printf "%.2f MiB" (math "$bytes / 1048576")
+        else
+            printf "%d B" $bytes
+        end
+    end
+
+    if not validate-environment
         return 1
     end
 
-    if not command -q jq
-        echo "error: jq not found"
-        return 1
-    end
-
-    set -l files (_mst_scan_files)
+    set -l files (scan-files)
     if test (count $files) -eq 0
         echo "error: no .mkv files found in current directory"
         return 1
@@ -63,7 +91,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     echo "scanning tracks from: "(basename "$probe")
     echo ""
 
-    set -l tracks (_mst_scan_tracks "$probe")
+    set -l tracks (scan-tracks "$probe")
     if test (count $tracks) -eq 0
         echo "error: could not read tracks from $probe"
         return 1
@@ -153,7 +181,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
 
         for t in $keep_audio
             set -l parts (string split '|' "$t")
-            set -l id (_mst_find_track_id "$f" audio $parts[3] $parts[4])
+            set -l id (find-track-id "$f" audio $parts[3] $parts[4])
             if test -z "$id"
                 set -a missing "audio lang=$parts[3] $parts[4]"
             end
@@ -161,7 +189,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
 
         for t in $keep_subs
             set -l parts (string split '|' "$t")
-            set -l id (_mst_find_track_id "$f" subtitles $parts[3] $parts[4])
+            set -l id (find-track-id "$f" subtitles $parts[3] $parts[4])
             if test -z "$id"
                 set -a missing "subtitle lang=$parts[3] $parts[4]"
             end
@@ -205,8 +233,10 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         end
     end
 
+    set -l size_before (sum-size $files)
+
     echo ""
-    printf "  %d files will be processed\n" (count $files)
+    printf "  %d files will be processed"
     echo ""
 
     read -l -P "proceed? [y/N] " confirm
@@ -224,7 +254,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         set -l audio_ids
         for t in $keep_audio
             set -l parts (string split '|' "$t")
-            set -l id (_mst_find_track_id "$f" audio $parts[3] $parts[4])
+            set -l id (find-track-id "$f" audio $parts[3] $parts[4])
             if test -n "$id"
                 set -a audio_ids $id
             end
@@ -233,7 +263,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         set -l sub_ids
         for t in $keep_subs
             set -l parts (string split '|' "$t")
-            set -l id (_mst_find_track_id "$f" subtitles $parts[3] $parts[4])
+            set -l id (find-track-id "$f" subtitles $parts[3] $parts[4])
             if test -n "$id"
                 set -a sub_ids $id
             end
@@ -266,10 +296,17 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         end
     end
 
+    set -l size_after (sum-size $files)
+    set -l saved (math "$size_before - $size_after")
+
     echo ""
     if test $errors -eq 0
-        echo "done — "(count $files)" files processed"
+        echo "done - "(count $files)" files processed"
     else
         echo "done with $errors error(s)"
     end
+
+    printf "  before: %s\n" (format-size $size_before)
+    printf "  after:  %s\n" (format-size $size_after)
+    printf "  saved:  %s\n" (format-size $saved)
 end

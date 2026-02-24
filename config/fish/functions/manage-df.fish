@@ -11,7 +11,7 @@ function manage-df -d "manage dotfiles using gnu stow"
         end
 
         if not command -q stow
-            echo "error: gnu stow is not installed. install it with 'sudo pacman -S stow'."
+            echo "error: gnu stow is not found - install with 'sudo pacman -S stow'"
             return 1
         end
     end
