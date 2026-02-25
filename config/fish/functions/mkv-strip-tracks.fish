@@ -357,10 +357,15 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
 
     echo ""
 
-    set -l done_msg (test $errors -eq 0 && echo "done - "(count $files)" files processed" || echo "done with $errors error(s)")
-    set -l notify_urgency (test $errors -eq 0 && echo "" || echo "-u critical")
-    echo $done_msg
-    notify-send $notify_urgency "mkv-strip-tracks" $done_msg
+    if test $errors -eq 0
+        set -l msg "done - "(count $files)" files processed"
+        echo $msg
+        notify-send "mkv-strip-tracks" $msg
+    else
+        set -l msg "done with $errors error(s)"
+        echo $msg
+        notify-send -u critical "mkv-strip-tracks" $msg
+    end
 
     printf "  before: %s\n" (format-size $size_before)
     printf "  after:  %s\n" (format-size $size_after)
