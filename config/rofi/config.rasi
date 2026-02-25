@@ -15,7 +15,7 @@ configuration {
     show-icons:                 true;
     icon-theme:                 "Papirus-Dark";
 
-    font:                       "CaskaydiaCove Nerd Font 16";
+    font:                       "IosevkaTerm Nerd Font Mono 16";
 
     me-select-entry:            "";
     me-accept-entry:            "MousePrimary";

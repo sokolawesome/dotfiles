@@ -1,6 +1,5 @@
 bibata-cursor-git
 catppuccin-gtk-theme-macchiato
-claude-code
 lazyssh-bin
 proton-community-updater
 teamspeak

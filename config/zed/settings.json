@@ -1,7 +1,7 @@
 {
     "icon_theme": "Material Icon Theme",
     "ui_font_family": "Noto Sans",
-    "buffer_font_family": "Iosevka Nerd Font Mono",
+    "buffer_font_family": "IosevkaTerm Nerd Font Mono",
     "ui_font_size": 18,
     "buffer_font_size": 18,
     "preferred_line_length": 100,
