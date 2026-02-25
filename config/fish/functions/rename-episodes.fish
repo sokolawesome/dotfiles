@@ -3,7 +3,7 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
     function _re_detect_season
         set -l dir (basename "$PWD")
         if string match -qr '(?i)season[\s._-]*([0-9]+)' "$dir"
-            printf "%02d" (string match -r '(?i)season[\s._-]*([0-9]+)' "$dir")[2]
+            printf "%02d" (string replace -r '^0*' '' (string match -r '(?i)season[\s._-]*([0-9]+)' "$dir")[2])
             return 0
         end
         return 1

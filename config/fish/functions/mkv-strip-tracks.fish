@@ -291,6 +291,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         echo "cancelled"
         return 1
     end
+    echo ""
 
     set -l errors 0
     set -l time_start (date +%s | string replace -r '\..+' '')
@@ -355,11 +356,11 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     set -l saved (math "$size_before - $size_after")
 
     echo ""
-    if test $errors -eq 0
-        echo "done - "(count $files)" files processed"
-    else
-        echo "done with $errors error(s)"
-    end
+
+    set -l done_msg (test $errors -eq 0 && echo "done - "(count $files)" files processed" || echo "done with $errors error(s)")
+    set -l notify_urgency (test $errors -eq 0 && echo "" || echo "-u critical")
+    echo $done_msg
+    notify-send $notify_urgency "mkv-strip-tracks" $done_msg
 
     printf "  before: %s\n" (format-size $size_before)
     printf "  after:  %s\n" (format-size $size_after)
