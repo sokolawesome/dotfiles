@@ -1,8 +1,7 @@
 bibata-cursor-git
-catppuccin-gtk-theme-macchiato
 lazyssh-bin
+noctalia-shell
 proton-community-updater
 teamspeak
-wlogout
 yay
 zen-browser-bin

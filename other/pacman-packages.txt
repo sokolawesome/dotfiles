@@ -1,4 +1,5 @@
 7zip
+adw-gtk-theme
 amd-ucode
 base
 base-devel
@@ -34,13 +35,11 @@ gtk4-layer-shell
 hypridle
 hyprland
 hyprland-qt-support
-hyprlock
 hyprpicker
 hyprpolkitagent
 jq
 just
 kitty
-kvantum
 lazydocker
 lazygit
 lemurs
@@ -54,7 +53,6 @@ linux-zen
 linux-zen-headers
 lua-jsregexp
 luarocks
-mako
 man-db
 micro
 mkvtoolnix-cli
@@ -85,12 +83,12 @@ polkit-kde-agent
 poppler
 poppler-data
 qbittorrent
+qt5ct
 qt6-wayland
 qt6ct
 reflector
 resvg
 ripgrep
-rofi
 slurp
 smartmontools
 sshfs
