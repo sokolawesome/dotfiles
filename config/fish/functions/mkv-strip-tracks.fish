@@ -10,6 +10,12 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
             echo "error: jq not found - install with 'sudo pacman -S jq'"
             return 1
         end
+
+        if not command -q notify-send
+            echo "error: notify-send not found - install with 'pacman -S notify-send'"
+            return 1
+        end
+
         if not command -q stdbuf
             echo "error: stdbuf not found - install with 'sudo pacman -S coreutils'"
             return 1
@@ -24,6 +30,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
                 (.id | tostring),
                 .type,
                 (.properties.language_ietf // .properties.language // "und"),
+                (.properties.codec_id // ""),
                 ((.properties.track_name // "") | gsub("[|]"; "/"))
             ] | join("|")
         '
@@ -113,7 +120,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     for t in $tracks
         set -l parts (string split '|' "$t")
         if test "$parts[2]" = audio
-            printf "  [%d] id=%-2s  lang=%-6s  %s\n" $idx $parts[1] $parts[3] $parts[4]
+            printf "  [%d] id=%-2s  lang=%-6s  codec=%-20s  %s\n" $idx $parts[1] $parts[3] $parts[4] $parts[5]
             set -a audio_tracks "$t"
             set idx (math $idx + 1)
         end
@@ -125,7 +132,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     for t in $tracks
         set -l parts (string split '|' "$t")
         if test "$parts[2]" = subtitles
-            printf "  [%d] id=%-2s  lang=%-6s  %s\n" $idx $parts[1] $parts[3] $parts[4]
+            printf "  [%d] id=%-2s  lang=%-6s  codec=%-20s  %s\n" $idx $parts[1] $parts[3] $parts[4] $parts[5]
             set -a sub_tracks "$t"
             set idx (math $idx + 1)
         end
@@ -169,12 +176,12 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         set -l parts (string split '|' "$t")
         set -l type $parts[2]
         set -l lang $parts[3]
-        set -l name $parts[4]
+        set -l name $parts[5]
         set -l probe_id $parts[1]
         set -l pos 0
         for candidate in $tracks
             set -l cp (string split '|' "$candidate")
-            if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[4]" = "$name"
+            if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[5]" = "$name"
                 if test "$cp[1]" = "$probe_id"
                     break
                 end
@@ -189,12 +196,12 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
         set -l parts (string split '|' "$t")
         set -l type $parts[2]
         set -l lang $parts[3]
-        set -l name $parts[4]
+        set -l name $parts[5]
         set -l probe_id $parts[1]
         set -l pos 0
         for candidate in $tracks
             set -l cp (string split '|' "$candidate")
-            if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[4]" = "$name"
+            if test "$cp[2]" = "$type" -a "$cp[3]" = "$lang" -a "$cp[5]" = "$name"
                 if test "$cp[1]" = "$probe_id"
                     break
                 end
@@ -209,11 +216,11 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     echo "  video: all"
     for t in $keep_audio
         set -l parts (string split '|' "$t")
-        printf "  audio:    lang=%-6s  %s\n" $parts[3] $parts[4]
+        printf "  audio:    lang=%-6s  codec=%-20s  %s\n" $parts[3] $parts[4] $parts[5]
     end
     for t in $keep_subs
         set -l parts (string split '|' "$t")
-        printf "  subtitle: lang=%-6s  %s\n" $parts[3] $parts[4]
+        printf "  subtitle: lang=%-6s  codec=%-20s  %s\n" $parts[3] $parts[4] $parts[5]
     end
 
     echo ""
@@ -342,7 +349,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
                 printf "\r  %-60s %3s%%" "$base" "$pct"
             end
         end
-        if test $pipestatus[1] -eq 0 -a "$ok" = true
+        if test $pipestatus[1] -eq 0
             mv "$temp" "$f"
             printf "\r  %-60s done\n" "$base"
         else

@@ -1,12 +1,16 @@
 fish_config theme choose "Rosé Pine Moon"
 
-export EDITOR="micro"
-export STARSHIP_CONFIG=.config/starship/starship.toml
+set -Ux EDITOR "micro"
+set -Ux STARSHIP_CONFIG ~/.config/starship/starship.toml
+set -Ux MANPAGER "bat -plman"
+set -Ux DOTFILES_PATH ~/dotfiles
+set -Ux PATH ~/bin ~/go/bin /usr/local/go/bin $PATH
 
-set -g fish_greeting
+set -U fish_greeting
 
-set -gx DOTFILES_PATH ~/dotfiles
-set -gx PATH ~/bin ~/go/bin /usr/local/go/bin $PATH
+abbr -a --position anywhere -- --help '--help | bat -plhelp'
+abbr -a --position anywhere -- -h '-h | bat -plhelp'
 
 zoxide init fish | source
 starship init fish | source
+fzf --fish | source
