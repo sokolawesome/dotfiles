@@ -10,7 +10,7 @@ $line_break\
 $python\
 $character"""
 
-scan_timeout = 1000
+scan_timeout = 5000
 
 [directory]
 style = "blue"
