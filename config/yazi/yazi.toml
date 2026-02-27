@@ -26,8 +26,8 @@ ueberzug_offset = [ 0, 0, 0, 0 ]
 
 [opener]
 edit = [
-	{ run = "${EDITOR:-vi} %s", desc = "$EDITOR",      for = "unix", block = true },
-	{ run = 'zeditor "$@"', desc = "Edit",      for = "unix", block = true },
+	{ run = "${EDITOR} %s", desc = "Edit via micro",      for = "unix", block = true },
+	{ run = 'zeditor "$@"', desc = "Edit via Zed",      for = "unix", block = true },
 ]
 play = [
 	{ run = 'mpv --force-window "$@"',     desc = "Play", for = "linux" },
@@ -54,7 +54,7 @@ download = [
 [open]
 rules = [
 	# Folder
-	{ url = "*/", use = [ "edit", "open", "reveal" ] },
+	{ url = "*/", use = [ "open" ] },
 	# Text
 	{ mime = "text/*", use = [ "edit", "reveal" ] },
 	# Image

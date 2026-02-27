@@ -8,8 +8,8 @@
     "tab_size": 4,
     "theme": {
         "mode": "system",
-        "light": "Gruvbox Dark Hard",
-        "dark": "Catppuccin Mocha",
+        "light": "Noctalia Light Transparent",
+        "dark": "Noctalia Dark",
     },
     "tabs": {
         "file_icons": true,
