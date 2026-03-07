@@ -12,5 +12,5 @@ abbr -a --position anywhere -- --help '--help | bat -plhelp'
 abbr -a --position anywhere -- -h '-h | bat -plhelp'
 
 zoxide init fish | source
-starship init fish | source
 fzf --fish | source
+starship init fish | source
