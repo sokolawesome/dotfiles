@@ -146,16 +146,6 @@
                     "textColor": "none",
                     "useFixedWidth": true,
                     "visualizerType": "linear"
-                },
-                {
-                    "colorizeIcons": false,
-                    "hideMode": "hidden",
-                    "id": "ActiveWindow",
-                    "maxWidth": 300,
-                    "scrollingMode": "always",
-                    "showIcon": true,
-                    "textColor": "none",
-                    "useFixedWidth": true
                 }
             ],
             "right": [
