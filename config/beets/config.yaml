@@ -4,5 +4,10 @@ library: /mnt/hdd/library.db
 import:
     move: yes
 
-plugins:
-    - deezer
+plugins: deezer spotify info inline scrub
+
+item_fields:
+  primary_albumartist: albumartist.split(',')[0]
+
+paths:
+  default: $primary_albumartist/$album/$track $title

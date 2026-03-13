@@ -9,8 +9,8 @@
         "density": "default",
         "enableClipPreview": true,
         "enableClipboardHistory": true,
-        "enableSessionSearch": true,
-        "enableSettingsSearch": true,
+        "enableSessionSearch": false,
+        "enableSettingsSearch": false,
         "enableWindowsSearch": true,
         "iconMode": "tabler",
         "ignoreMouseInput": false,
@@ -27,10 +27,10 @@
         "viewMode": "list"
     },
     "audio": {
-        "cavaFrameRate": 30,
         "mprisBlacklist": [
         ],
         "preferredPlayer": "",
+        "spectrumFrameRate": 30,
         "visualizerType": "linear",
         "volumeFeedback": false,
         "volumeFeedbackSoundFile": "",
@@ -47,6 +47,7 @@
         "contentPadding": 2,
         "density": "spacious",
         "displayMode": "always_visible",
+        "enableExclusionZoneInset": true,
         "floating": true,
         "fontScale": 1,
         "frameRadius": 12,
@@ -92,6 +93,7 @@
                     "enableScrollWheel": true,
                     "focusedColor": "primary",
                     "followFocusedScreen": false,
+                    "fontWeight": "bold",
                     "groupedBorderOpacity": 1,
                     "hideUnoccupied": false,
                     "iconScale": 0.8,
@@ -100,6 +102,7 @@
                     "occupiedColor": "secondary",
                     "pillSize": 0.7,
                     "showApplications": false,
+                    "showApplicationsHover": false,
                     "showBadge": true,
                     "showLabelsOnlyWhenOccupied": false,
                     "unfocusedIconsOpacity": 1
@@ -314,6 +317,7 @@
     "desktopWidgets": {
         "enabled": false,
         "gridSnap": false,
+        "gridSnapScale": false,
         "monitorWidgets": [
         ],
         "overviewEnabled": true
@@ -360,7 +364,7 @@
         "clockFormat": "hh\\nmm",
         "clockStyle": "digital",
         "compactLockScreen": false,
-        "dimmerOpacity": 0.3,
+        "dimmerOpacity": 0.2,
         "enableBlurBehind": true,
         "enableLockScreenCountdown": true,
         "enableLockScreenMediaControls": false,
@@ -473,10 +477,14 @@
         "manualSunset": "18:30",
         "nightTemp": "2785"
     },
+    "noctaliaPerformance": {
+        "disableDesktopWidgets": true,
+        "disableWallpaper": true
+    },
     "notifications": {
         "backgroundOpacity": 1,
         "clearDismissed": true,
-        "criticalUrgencyDuration": 15,
+        "criticalUrgencyDuration": 10,
         "density": "default",
         "enableBatteryToast": true,
         "enableKeyboardLayoutToast": false,
@@ -484,10 +492,10 @@
         "enableMediaToast": false,
         "enabled": true,
         "location": "top_right",
-        "lowUrgencyDuration": 3,
+        "lowUrgencyDuration": 2,
         "monitors": [
         ],
-        "normalUrgencyDuration": 8,
+        "normalUrgencyDuration": 5,
         "overlayLayer": true,
         "respectExpireTimeout": false,
         "saveToHistory": {
@@ -562,7 +570,7 @@
                 "command": "",
                 "countdownEnabled": true,
                 "enabled": false,
-                "keybind": "5"
+                "keybind": ""
             },
             {
                 "action": "shutdown",
@@ -577,12 +585,19 @@
                 "countdownEnabled": true,
                 "enabled": false,
                 "keybind": ""
+            },
+            {
+                "action": "userspaceReboot",
+                "command": "",
+                "countdownEnabled": true,
+                "enabled": false,
+                "keybind": ""
             }
         ],
         "showHeader": true,
         "showKeybinds": true
     },
-    "settingsVersion": 56,
+    "settingsVersion": 57,
     "systemMonitor": {
         "batteryCriticalThreshold": 5,
         "batteryWarningThreshold": 20,
@@ -663,9 +678,11 @@
         "fontFixedScale": 1,
         "panelBackgroundOpacity": 1,
         "panelsAttachedToBar": true,
+        "scrollbarAlwaysVisible": true,
         "settingsPanelMode": "centered",
         "settingsPanelSideBarCardStyle": false,
-        "tooltipsEnabled": true
+        "tooltipsEnabled": true,
+        "translucentWidgets": false
     },
     "wallpaper": {
         "automationEnabled": false,
