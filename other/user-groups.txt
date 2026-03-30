@@ -1,4 +1,5 @@
 docker
+gamemode
 input
 seat
 sokolawesome

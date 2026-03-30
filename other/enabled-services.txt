@@ -8,9 +8,6 @@ lm_sensors.service
 NetworkManager-dispatcher.service
 NetworkManager-wait-online.service
 NetworkManager.service
-nvidia-hibernate.service
-nvidia-resume.service
-nvidia-suspend.service
 sshd.service
 systemd-resolved.service
 systemd-timesyncd.service

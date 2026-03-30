@@ -8,10 +8,12 @@
         "customLaunchPrefixEnabled": false,
         "density": "default",
         "enableClipPreview": true,
+        "enableClipboardChips": true,
         "enableClipboardHistory": true,
+        "enableClipboardSmartIcons": true,
         "enableSessionSearch": false,
         "enableSettingsSearch": false,
-        "enableWindowsSearch": true,
+        "enableWindowsSearch": false,
         "iconMode": "tabler",
         "ignoreMouseInput": false,
         "overviewLayer": false,
@@ -23,7 +25,6 @@
         "showIconBackground": false,
         "sortByMostUsed": true,
         "terminalCommand": "kitty -e",
-        "useApp2Unit": false,
         "viewMode": "list"
     },
     "audio": {
@@ -31,6 +32,7 @@
         ],
         "preferredPlayer": "",
         "spectrumFrameRate": 30,
+        "spectrumMirrored": true,
         "visualizerType": "linear",
         "volumeFeedback": false,
         "volumeFeedbackSoundFile": "",
@@ -48,7 +50,6 @@
         "density": "spacious",
         "displayMode": "always_visible",
         "enableExclusionZoneInset": true,
-        "floating": true,
         "fontScale": 1,
         "frameRadius": 12,
         "frameThickness": 8,
@@ -121,7 +122,7 @@
                     "showDiskAvailable": false,
                     "showDiskUsage": false,
                     "showDiskUsageAsPercent": false,
-                    "showGpuTemp": true,
+                    "showGpuTemp": false,
                     "showLoadAverage": false,
                     "showMemoryAsPercent": false,
                     "showMemoryUsage": true,
@@ -329,8 +330,10 @@
         "indicatorColor": "primary",
         "indicatorOpacity": 0.6,
         "indicatorThickness": 3,
+        "launcherIcon": "",
         "launcherIconColor": "none",
         "launcherPosition": "end",
+        "launcherUseDistroLogo": false,
         "monitors": [
         ],
         "onlySameOutput": true,
@@ -408,6 +411,7 @@
         "telemetryEnabled": true
     },
     "hooks": {
+        "colorGeneration": "",
         "darkModeChange": "",
         "enabled": false,
         "performanceModeDisabled": "",
@@ -455,13 +459,12 @@
         "bluetoothRssiPollingEnabled": false,
         "disableDiscoverability": false,
         "networkPanelView": "wifi",
-        "wifiDetailsViewMode": "grid",
-        "wifiEnabled": false
+        "wifiDetailsViewMode": "grid"
     },
     "nightLight": {
         "autoSchedule": true,
         "dayTemp": "6500",
-        "enabled": true,
+        "enabled": false,
         "forced": false,
         "manualSunrise": "06:30",
         "manualSunset": "18:30",
@@ -518,7 +521,8 @@
         "overlayLayer": true
     },
     "plugins": {
-        "autoUpdate": false
+        "autoUpdate": false,
+        "notifyUpdates": true
     },
     "sessionMenu": {
         "countdownDuration": 5000,
@@ -587,7 +591,7 @@
         "showHeader": true,
         "showKeybinds": true
     },
-    "settingsVersion": 57,
+    "settingsVersion": 59,
     "systemMonitor": {
         "batteryCriticalThreshold": 5,
         "batteryWarningThreshold": 20,
@@ -656,6 +660,10 @@
             {
                 "enabled": true,
                 "id": "qt"
+            },
+            {
+                "enabled": true,
+                "id": "code"
             }
         ],
         "enableUserTheming": false
@@ -685,6 +693,16 @@
         "fillMode": "stretch",
         "hideWallpaperFilenames": true,
         "monitorDirectories": [
+            {
+                "directory": "/home/sokolawesome/Pictures/Wallpapers",
+                "name": "DP-3",
+                "wallpaper": ""
+            },
+            {
+                "directory": "/home/sokolawesome/Pictures/Wallpapers",
+                "name": "DP-6",
+                "wallpaper": ""
+            }
         ],
         "overviewBlur": 0.4,
         "overviewEnabled": false,
@@ -698,7 +716,10 @@
         "sortOrder": "name",
         "transitionDuration": 1000,
         "transitionEdgeSmoothness": 0.05,
-        "transitionType": "disc",
+        "transitionType": [
+            "disc"
+        ],
+        "useOriginalImages": false,
         "useSolidColor": false,
         "useWallhaven": false,
         "viewMode": "single",

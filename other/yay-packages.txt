@@ -2,6 +2,8 @@ bibata-cursor-git
 lazyssh-bin
 noctalia-shell
 proton-community-updater
+rsgain
 teamspeak
+visual-studio-code-bin
 yay
 zen-browser-bin

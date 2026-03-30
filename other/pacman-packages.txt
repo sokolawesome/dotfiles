@@ -4,6 +4,7 @@ amd-ucode
 base
 base-devel
 bat
+beets
 blueman
 bluez-utils
 btop
@@ -24,18 +25,20 @@ firewalld
 fish
 fisher
 fzf
+gamemode
 git
 git-delta
+glow
 gnome-keyring
 go
 golangci-lint
+goverlay
 grim
 gst-plugin-pipewire
 gtk4-layer-shell
 hyprland
 hyprland-qt-support
 hyprpicker
-hyprpolkitagent
 jq
 just
 kitty
@@ -43,6 +46,8 @@ lazydocker
 lazygit
 lemurs
 less
+lib32-gamemode
+lib32-mangohud
 lib32-nvidia-utils
 libnotify
 libpulse
@@ -51,8 +56,8 @@ linux-firmware
 linux-zen
 linux-zen-headers
 lua-jsregexp
-luarocks
 man-db
+mangohud
 micro
 mkvtoolnix-cli
 mpv
@@ -97,7 +102,6 @@ steam
 stow
 stylua
 swappy
-swww
 systemd-resolvconf
 tailscale
 telegram-desktop
@@ -120,7 +124,6 @@ xorg-xinit
 xsettingsd
 yazi
 zathura-pdf-poppler
-zed
 zip
 zoxide
 zram-generator
