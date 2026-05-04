@@ -18,10 +18,16 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
         end
     end
 
+    function _re_normalize_underscores
+        set -l name $argv[1]
+        echo (string replace -ar '_' ' ' "$name")
+    end
+
     function _re_extract_episode
         set -l raw $argv[1]
         set -l name (string replace -r '\.[^.]+$' '' "$raw")
         set -l normalized (_re_normalize_dots "$name")
+        set normalized (_re_normalize_underscores "$normalized")
 
         function _re_pad
             set -l n (string replace -r '^0*' '' "$argv[1]")
@@ -53,20 +59,20 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
             return 0
         end
 
-        if string match -qr ' - ([0-9]{1,3})[ .]' "$name"
-            set -l m (string match -r ' - ([0-9]{1,3})[ .]' "$name")
+        if string match -qr ' - ([0-9]{1,3})[ .]' "$normalized"
+            set -l m (string match -r ' - ([0-9]{1,3})[ .]' "$normalized")
             printf "00:%s" (_re_pad $m[2])
             return 0
         end
 
-        if string match -qr '[ -]([0-9]{1,3})$' "$name"
-            set -l m (string match -r '[ -]([0-9]{1,3})$' "$name")
+        if string match -qr '[ -]([0-9]{1,3})$' "$normalized"
+            set -l m (string match -r '[ -]([0-9]{1,3})$' "$normalized")
             printf "00:%s" (_re_pad $m[2])
             return 0
         end
 
-        if string match -qr '^([0-9]{1,3})[\. ]' "$name"
-            set -l m (string match -r '^([0-9]{1,3})[\. ]' "$name")
+        if string match -qr '^([0-9]{1,3})[\. ]' "$normalized"
+            set -l m (string match -r '^([0-9]{1,3})[\. ]' "$normalized")
             printf "00:%s" (_re_pad $m[2])
             return 0
         end
@@ -155,10 +161,10 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
             -o -name "*.mka" -o -name "*.ac3" -o -name "*.eac3" \
             -o -name "*.flac" -o -name "*.aac" \
             -o -name "*.ass" -o -name "*.srt" -o -name "*.vtt" -o -name "*.sub" \
-        \) | sort
+            \) | sort
     end
 
-    argparse 's/season=' 'o/offset=' 'h/help' -- $argv
+    argparse 's/season=' 'o/offset=' h/help -- $argv
     or return 1
 
     if set -q _flag_help
@@ -216,7 +222,7 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
                 set ep_num (printf "%02d" (math "$ep_num_decimal + $offset"))
             end
 
-            if test "$ep_season" = "00"
+            if test "$ep_season" = 00
                 set ep_season "$season"
             end
 
@@ -262,8 +268,8 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
     echo ""
 
     read -l -P "proceed? [y/N] " confirm
-    if not string match -qi 'y' "$confirm"
-        echo "cancelled"
+    if not string match -qi y "$confirm"
+        echo cancelled
         return 1
     end
 

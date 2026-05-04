@@ -84,7 +84,7 @@
                     "formatHorizontal": "HH:mm ddd, MMM dd",
                     "formatVertical": "HH mm - dd MM",
                     "id": "Clock",
-                    "tooltipFormat": "HH:mm ddd, MMM dd",
+                    "tooltipFormat": "HH:mm ddd, MM/dd",
                     "useCustomFont": false
                 },
                 {
@@ -137,7 +137,7 @@
                     "hideMode": "hidden",
                     "hideWhenIdle": false,
                     "id": "MediaMini",
-                    "maxWidth": 300,
+                    "maxWidth": 320,
                     "panelShowAlbumArt": true,
                     "scrollingMode": "always",
                     "showAlbumArt": true,
@@ -145,7 +145,7 @@
                     "showProgressRing": false,
                     "showVisualizer": true,
                     "textColor": "none",
-                    "useFixedWidth": true,
+                    "useFixedWidth": false,
                     "visualizerType": "linear"
                 }
             ],
@@ -215,6 +215,7 @@
                 {
                     "colorizeDistroLogo": false,
                     "colorizeSystemIcon": "none",
+                    "colorizeSystemText": "none",
                     "customIconPath": "",
                     "enableColorization": false,
                     "icon": "noctalia",
@@ -255,6 +256,7 @@
         "monitorForColors": "",
         "predefinedScheme": "Catppuccin",
         "schedulingMode": "off",
+        "syncGsettings": true,
         "useWallpaperColors": true
     },
     "controlCenter": {
@@ -358,7 +360,7 @@
         "clockStyle": "digital",
         "compactLockScreen": false,
         "dimmerOpacity": 0.2,
-        "enableBlurBehind": true,
+        "enableBlurBehind": false,
         "enableLockScreenCountdown": true,
         "enableLockScreenMediaControls": false,
         "enableShadows": false,
@@ -408,6 +410,7 @@
         "showHibernateOnLockScreen": false,
         "showScreenCorners": false,
         "showSessionButtonsOnLockScreen": true,
+        "smoothScrollEnabled": true,
         "telemetryEnabled": true
     },
     "hooks": {
@@ -438,6 +441,7 @@
     },
     "location": {
         "analogClockInCalendar": false,
+        "autoLocate": false,
         "firstDayOfWeek": -1,
         "hideWeatherCityName": false,
         "hideWeatherTimezone": false,
@@ -448,10 +452,10 @@
         "use12hourFormat": false,
         "useFahrenheit": false,
         "weatherEnabled": true,
-        "weatherShowEffects": true
+        "weatherShowEffects": true,
+        "weatherTaliaMascotAlways": false
     },
     "network": {
-        "airplaneModeEnabled": false,
         "bluetoothAutoConnect": true,
         "bluetoothDetailsViewMode": "grid",
         "bluetoothHideUnnamedDevices": false,
@@ -464,7 +468,7 @@
     "nightLight": {
         "autoSchedule": true,
         "dayTemp": "6500",
-        "enabled": false,
+        "enabled": true,
         "forced": false,
         "manualSunrise": "06:30",
         "manualSunset": "18:30",
@@ -487,6 +491,7 @@
         "location": "top_right",
         "lowUrgencyDuration": 2,
         "monitors": [
+            "DP-6"
         ],
         "normalUrgencyDuration": 5,
         "overlayLayer": true,
@@ -517,6 +522,7 @@
         ],
         "location": "bottom",
         "monitors": [
+            "DP-6"
         ],
         "overlayLayer": true
     },
@@ -669,7 +675,7 @@
         "enableUserTheming": false
     },
     "ui": {
-        "boxBorderEnabled": true,
+        "boxBorderEnabled": false,
         "fontDefault": "IosevkaTerm Nerd Font Mono",
         "fontDefaultScale": 1,
         "fontFixed": "IosevkaTerm Nerd Font Mono",
@@ -692,6 +698,7 @@
         "fillColor": "#000000",
         "fillMode": "stretch",
         "hideWallpaperFilenames": true,
+        "linkLightAndDarkWallpapers": true,
         "monitorDirectories": [
             {
                 "directory": "/home/sokolawesome/Pictures/Wallpapers",
