@@ -9,6 +9,12 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
         return 1
     end
 
+    function _re_pad
+        set -l n (string replace -r '^0*' '' "$argv[1]")
+        test -z "$n" && set n 0
+        printf "%02d" $n
+    end
+
     function _re_normalize_dots
         set -l name $argv[1]
         if not string match -q '* *' "$name"
@@ -23,26 +29,30 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
         echo (string replace -ar '_' ' ' "$name")
     end
 
+    function _re_strip_tags
+        set -l name $argv[1]
+        set name (string replace -ar '(?i)\[[^\]]*(?:bdrip|webrip|web.dl|bluray|x26[45]|hevc|avc|flac|aac|ac3|eac3|dts|opus|10bit|8bit|[0-9]{3,4}p|[0-9]{4}x[0-9]{3,4})[^\]]*\]' '' "$name")
+        set name (string replace -ar '(?i)\([^)]*(?:bdrip|webrip|web.dl|bluray|x26[45]|hevc|avc|flac|aac|ac3|eac3|dts|opus|10bit|8bit|[0-9]{3,4}p|[0-9]{4}x[0-9]{3,4})[^)]*\)' '' "$name")
+        set name (string replace -ar '(?i)\b(?:bdrip|webrip|web-dl|bluray|x26[45]|hevc|avc|flac|aac|ac3|eac3|dts|opus|10bit|8bit|[0-9]{3,4}p|[0-9]{4}x[0-9]{3,4})\b' '' "$name")
+        echo (string trim "$name")
+    end
+
     function _re_extract_episode
         set -l raw $argv[1]
         set -l name (string replace -r '\.[^.]+$' '' "$raw")
-        set -l normalized (_re_normalize_dots "$name")
-        set normalized (_re_normalize_underscores "$normalized")
 
-        function _re_pad
-            set -l n (string replace -r '^0*' '' "$argv[1]")
-            test -z "$n" && set n 0
-            printf "%02d" $n
-        end
-
-        if string match -qr '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized"
-            set -l m (string match -r '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized")
+        if string match -qr '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name"
+            set -l m (string match -r '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name")
             printf "%s:%s" (_re_pad $m[2]) (_re_pad $m[3])
             return 0
         end
 
-        if string match -qr '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name"
-            set -l m (string match -r '(?i)S([0-9]{1,2})\.E([0-9]{1,3})' "$name")
+        set -l normalized (_re_normalize_dots "$name")
+        set normalized (_re_normalize_underscores "$normalized")
+        set normalized (_re_strip_tags "$normalized")
+
+        if string match -qr '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized"
+            set -l m (string match -r '(?i)S([0-9]{1,2})E([0-9]{1,3})' "$normalized")
             printf "%s:%s" (_re_pad $m[2]) (_re_pad $m[3])
             return 0
         end
@@ -53,8 +63,8 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
             return 0
         end
 
-        if string match -qr '\[([0-9]{1,3})\]' "$name"
-            set -l m (string match -r '\[([0-9]{1,3})\]' "$name")
+        if string match -qr '\[([0-9]{1,3})\]' "$normalized"
+            set -l m (string match -r '\[([0-9]{1,3})\]' "$normalized")
             printf "00:%s" (_re_pad $m[2])
             return 0
         end
@@ -73,6 +83,12 @@ function rename-episodes -d "bulk rename tv show episodes with proper S01E01 for
 
         if string match -qr '^([0-9]{1,3})[\. ]' "$normalized"
             set -l m (string match -r '^([0-9]{1,3})[\. ]' "$normalized")
+            printf "00:%s" (_re_pad $m[2])
+            return 0
+        end
+
+        if string match -qr ' ([0-9]{1,3}) ' "$normalized"
+            set -l m (string match -r ' ([0-9]{1,3}) ' "$normalized")
             printf "00:%s" (_re_pad $m[2])
             return 0
         end
