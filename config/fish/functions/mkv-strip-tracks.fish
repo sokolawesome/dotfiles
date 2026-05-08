@@ -139,13 +139,13 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     end
 
     echo ""
-    read -l -P "audio tracks to keep (space-separated numbers, or 'all'): " audio_input
+    read -l -P "audio tracks to keep (space-separated numbers, or 'all', or 'none'): " audio_input
     read -l -P "subtitle tracks to keep (space-separated numbers, or 'all', or 'none'): " sub_input
 
     set -l keep_audio
     if test "$audio_input" = all
         set keep_audio $audio_tracks
-    else
+    else if test "$audio_input" != none -a -n "$audio_input"
         for n in (string split ' ' "$audio_input")
             set -l i (math "$n - 1")
             if test $i -ge 0 -a $i -lt (count $audio_tracks)
@@ -164,11 +164,6 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
                 set -a keep_subs $sub_tracks[(math $i + 1)]
             end
         end
-    end
-
-    if test (count $keep_audio) -eq 0
-        echo "error: at least one audio track must be kept"
-        return 1
     end
 
     set -l audio_specs
@@ -282,7 +277,7 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
             case 2
                 echo "processing all "(count $files)" files"
             case '*'
-                echo "aborted"
+                echo aborted
                 return 1
         end
     end
@@ -294,8 +289,8 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     echo ""
 
     read -l -P "proceed? [y/N] " confirm
-    if not string match -qi 'y' "$confirm"
-        echo "cancelled"
+    if not string match -qi y "$confirm"
+        echo cancelled
         return 1
     end
     echo ""
@@ -367,11 +362,11 @@ function mkv-strip-tracks -d "interactively strip audio/subtitle tracks from MKV
     if test $errors -eq 0
         set -l msg "done - "(count $files)" files processed"
         echo $msg
-        notify-send "mkv-strip-tracks" $msg
+        notify-send mkv-strip-tracks $msg
     else
         set -l msg "done with $errors error(s)"
         echo $msg
-        notify-send -u critical "mkv-strip-tracks" $msg
+        notify-send -u critical mkv-strip-tracks $msg
     end
 
     printf "  before: %s\n" (format-size $size_before)
