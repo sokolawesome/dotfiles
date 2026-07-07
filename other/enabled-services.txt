@@ -1,7 +1,6 @@
 # system services
 bluetooth.service
 docker.service
-firewalld.service
 getty@.service
 lemurs.service
 lm_sensors.service

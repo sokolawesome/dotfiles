@@ -14,6 +14,7 @@ cliphist
 ddcutil
 delve
 dkms
+dmidecode
 docker
 docker-compose
 dosfstools
@@ -21,7 +22,6 @@ efibootmgr
 eza
 fastfetch
 fd
-firewalld
 fish
 fisher
 fzf
@@ -51,6 +51,7 @@ lib32-mangohud
 lib32-nvidia-utils
 libnotify
 libpulse
+libtorrent
 libva-nvidia-driver
 linux-firmware
 linux-zen
@@ -63,7 +64,6 @@ mkvtoolnix-cli
 mpv
 mpv-mpris
 ncdu
-neovim
 network-manager-applet
 networkmanager
 noto-fonts-cjk
