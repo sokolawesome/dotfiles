@@ -1,4 +1,5 @@
 hl.env("XCURSOR_SIZE", "24")
+hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_THEME", "Bibata-Modern-Ice")
 
@@ -15,9 +16,6 @@ hl.env("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
 hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 
-hl.env("GDK_SCALE", "1")
-hl.env("QT_SCALE_FACTOR", "1")
-
 hl.env("QT_QUICK_CONTROLS_STYLE", "org.hyprland.style")
 
 hl.env("GBM_BACKEND", "nvidia-drm")
@@ -31,11 +29,6 @@ if runtime_dir then
     hl.env("SSH_AUTH_SOCK", runtime_dir .. "/ssh-agent.socket")
 end
 
-hl.env("WLR_NO_HARDWARE_CURSORS", "1")
-hl.env("WLR_RENDERER_ALLOW_SOFTWARE", "1")
-hl.env("HYPRLAND_LOG_WLR", "1")
-
 hl.env("MOZ_ENABLE_WAYLAND", "1")
-hl.env("FIREFOX_ENABLE_WAYLAND", "1")
 
 hl.env("QS_ICON_THEME", "Papirus-Dark")

@@ -1,6 +1,4 @@
 hl.on("hyprland.start", function()
-    hl.exec_cmd("~/bin/hyprland/xdg.sh")
-
     hl.exec_cmd('gsettings set org.gnome.desktop.interface font-name "Noto Sans 11"')
     hl.exec_cmd('gsettings set org.gnome.desktop.interface document-font-name "Noto Sans 11"')
     hl.exec_cmd('gsettings set org.gnome.desktop.interface monospace-font-name "IosevkaTerm Nerd Font Mono 11"')

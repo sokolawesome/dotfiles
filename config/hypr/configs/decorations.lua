@@ -4,8 +4,14 @@ hl.config({
         gaps_out = 2,
         border_size = 4,
 
-        layout = "master",
+        layout = "scrolling",
         allow_tearing = true,
+
+        resize_on_border = true,
+
+        snap = {
+            enabled = true,
+        },
     },
 
     decoration = {
@@ -43,10 +49,16 @@ hl.config({
 
         focus_on_activate = false,
 
-        vrr = 0,
+        middle_click_paste = false,
+
+        vrr = 3,
 
         initial_workspace_tracking = 1,
 
         close_special_on_empty = true,
+    },
+
+    ecosystem = {
+        no_donation_nag = true,
     },
 })

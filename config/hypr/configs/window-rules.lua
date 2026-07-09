@@ -2,13 +2,14 @@
 --    general window rules    --
 -------------------------------
 
--- prevent windows from being automatically maximized
--- hl.window_rule({ match = { class = ".*" }, suppress_event = "maximize" })
--- ignore focus for unnamed or background xwayland windows
--- hl.window_rule({
---     match = { class = "^$", title = "^$", xwayland = true, float = true, fullscreen = false, pin = false },
---     no_focus = true,
--- })
+hl.window_rule({ match = { class = ".*" }, suppress_event = "maximize" })
+
+hl.window_rule({
+    match = { class = "^$", title = "^$", xwayland = true, float = true, fullscreen = false, pin = false },
+    no_focus = true,
+})
+
+hl.window_rule({ match = { class = ".*" }, idle_inhibit = "fullscreen" })
 
 -------------------------------
 --   workspace assignments   --
@@ -70,6 +71,7 @@ hl.window_rule({
     match = { initial_class = "steam_app_" },
     workspace = "8",
     immediate = true,
+    content = "game",
 })
 
 hl.window_rule({

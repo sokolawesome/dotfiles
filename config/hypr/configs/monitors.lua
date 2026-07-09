@@ -1,7 +1,16 @@
 local huawei = "desc:Huawei Technologies Co. Inc. ZQE-CBA 0xC080F622"
 local xiaomi = "desc:Xiaomi Corporation Mi Monitor 5640810077619"
 
-hl.monitor({ output = huawei, mode = "3440x1440@165.00", position = "2560x0", scale = 1, bitdepth = 10 })
+hl.monitor({
+    output = huawei,
+    mode = "3440x1440@165.00",
+    position = "2560x0",
+    scale = 1,
+    bitdepth = 10,
+    cm = "auto",
+    sdr_eotf = "gamma22",
+    sdrbrightness = 1.2,
+})
 hl.monitor({ output = xiaomi, mode = "2560x1440@75", position = "0x0", scale = 1 })
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 

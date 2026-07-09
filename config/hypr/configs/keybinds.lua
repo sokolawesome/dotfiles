@@ -66,6 +66,12 @@ hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
+-- scrolling layout
+hl.bind(mainMod .. " + R", hl.dsp.layout("colresize +conf")) -- cycle column width (0.333 / 0.5 / 0.667 / 1.0)
+hl.bind(mainMod .. " + bracketleft", hl.dsp.layout("move -col"))
+hl.bind(mainMod .. " + bracketright", hl.dsp.layout("move +col"))
+hl.bind(mainMod .. " + N", hl.dsp.layout("consume_or_expel next"))
+
 -- media
 hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
