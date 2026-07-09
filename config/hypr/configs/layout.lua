@@ -1,0 +1,11 @@
+hl.config({
+    dwindle = {
+        -- pseudotile = true,
+        preserve_split = true,
+        force_split = 2,
+    },
+
+    master = {
+        new_status = "slave",
+    },
+})

@@ -1,0 +1,18 @@
+hl.on("hyprland.start", function()
+    hl.exec_cmd("~/bin/hyprland/xdg.sh")
+
+    hl.exec_cmd('gsettings set org.gnome.desktop.interface font-name "Noto Sans 11"')
+    hl.exec_cmd('gsettings set org.gnome.desktop.interface document-font-name "Noto Sans 11"')
+    hl.exec_cmd('gsettings set org.gnome.desktop.interface monospace-font-name "IosevkaTerm Nerd Font Mono 11"')
+    hl.exec_cmd("gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3'")
+    hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'")
+
+    hl.exec_cmd("qs -c noctalia-shell --no-duplicate")
+    hl.exec_cmd("nm-applet")
+    hl.exec_cmd("blueman-applet")
+    hl.exec_cmd("wl-paste --type text --watch cliphist store -max-items 1000")
+    hl.exec_cmd("wl-paste --type image --watch cliphist store -max-items 1000")
+    hl.exec_cmd("wl-clip-persist --clipboard regular")
+
+    hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
+end)

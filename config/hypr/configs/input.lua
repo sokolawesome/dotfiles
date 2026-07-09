@@ -1,0 +1,12 @@
+hl.config({
+    input = {
+        kb_layout = "us,ru",
+        kb_options = "grp:alt_shift_toggle,caps:escape",
+        follow_mouse = 1,
+
+        repeat_rate = 40,
+        repeat_delay = 210,
+
+        sensitivity = 0,
+    },
+})
