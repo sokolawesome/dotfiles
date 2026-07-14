@@ -7,9 +7,7 @@ hl.monitor({
     position = "2560x0",
     scale = 1,
     bitdepth = 10,
-    cm = "auto",
-    sdr_eotf = "gamma22",
-    sdrbrightness = 1.2,
+    cm = "dp3",
 })
 hl.monitor({ output = xiaomi, mode = "2560x1440@75", position = "0x0", scale = 1 })
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })

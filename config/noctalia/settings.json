@@ -112,6 +112,28 @@
             "left": [
                 {
                     "compactMode": false,
+                    "diskPath": "/",
+                    "iconColor": "none",
+                    "id": "SystemMonitor",
+                    "showCpuCores": false,
+                    "showCpuFreq": false,
+                    "showCpuTemp": true,
+                    "showCpuUsage": true,
+                    "showDiskAvailable": false,
+                    "showDiskUsage": false,
+                    "showDiskUsageAsPercent": false,
+                    "showGpuTemp": false,
+                    "showLoadAverage": false,
+                    "showMemoryAsPercent": false,
+                    "showMemoryUsage": true,
+                    "showNetworkStats": false,
+                    "showSwapUsage": false,
+                    "textColor": "none",
+                    "useMonospaceFont": true,
+                    "usePadding": true
+                },
+                {
+                    "compactMode": false,
                     "hideMode": "hidden",
                     "hideWhenIdle": false,
                     "id": "MediaMini",
@@ -412,7 +434,7 @@
     },
     "idle": {
         "customCommands": "[]",
-        "enabled": false,
+        "enabled": true,
         "fadeDuration": 10,
         "lockCommand": "",
         "lockTimeout": 0,
@@ -618,10 +640,6 @@
             },
             {
                 "enabled": true,
-                "id": "hyprland"
-            },
-            {
-                "enabled": true,
                 "id": "zenBrowser"
             },
             {
@@ -655,6 +673,10 @@
             {
                 "enabled": true,
                 "id": "code"
+            },
+            {
+                "enabled": true,
+                "id": "hyprland"
             }
         ],
         "enableUserTheming": false

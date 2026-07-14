@@ -4,7 +4,7 @@ library: /mnt/hdd/library.db
 import:
     move: yes
 
-plugins: deezer spotify info inline zero
+plugins: deezer spotify info inline zero fromfilename
 
 item_fields:
   primary_albumartist:  |
