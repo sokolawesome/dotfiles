@@ -26,6 +26,12 @@ hl.window_rule({ match = { class = "org.telegram.desktop" }, workspace = "4 sile
 --       floating tools      --
 -------------------------------
 
+hl.window_rule({
+    match = { class = "dev.noctalia.Noctalia" },
+    float = true,
+    size = { 1080, 920 },
+})
+
 hl.window_rule({ match = { class = "blueman-manager" }, float = true })
 
 hl.window_rule({

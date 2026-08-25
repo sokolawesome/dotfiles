@@ -1,31 +1,31 @@
 local mainMod = "SUPER"
 
 local function ipc(args)
-    return hl.dsp.exec_cmd("qs -c noctalia-shell ipc call " .. args)
+    return hl.dsp.exec_cmd("noctalia msg " .. args)
 end
 
 -- core binds
-hl.bind(mainMod .. " + SPACE", ipc("controlCenter toggle"))
-hl.bind(mainMod .. " + W", ipc("wallpaper toggle"))
-hl.bind(mainMod .. " + comma", ipc("settings toggle"))
-hl.bind(mainMod .. " + Escape", ipc("sessionMenu toggle"))
+hl.bind(mainMod .. " + SPACE", ipc("panel-toggle control-center"))
+hl.bind(mainMod .. " + W", ipc("panel-toggle wallpaper"))
+hl.bind(mainMod .. " + comma", ipc("settings-toggle"))
+hl.bind(mainMod .. " + Escape", ipc("panel-toggle session"))
 
 -- media keys
-hl.bind("XF86AudioRaiseVolume", ipc("volume increase"), { locked = true, repeating = true })
-hl.bind("XF86AudioLowerVolume", ipc("volume decrease"), { locked = true, repeating = true })
-hl.bind("XF86AudioMute", ipc("volume muteOutput"), { locked = true })
-hl.bind("XF86MonBrightnessUp", ipc("brightness increase"), { locked = true, repeating = true })
-hl.bind("XF86MonBrightnessDown", ipc("brightness decrease"), { locked = true, repeating = true })
+hl.bind("XF86AudioRaiseVolume", ipc("volume-up"), { locked = true, repeating = true })
+hl.bind("XF86AudioLowerVolume", ipc("volume-down"), { locked = true, repeating = true })
+hl.bind("XF86AudioMute", ipc("volume-mute"), { locked = true })
+hl.bind("XF86MonBrightnessUp", ipc("brightness-up"), { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", ipc("brightness-down"), { locked = true, repeating = true })
 
 -- app launchers
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("kitty"))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("zen-browser"))
 hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("code"))
-hl.bind(mainMod .. " + D", ipc("launcher toggle"))
+hl.bind(mainMod .. " + D", ipc("panel-toggle launcher"))
 hl.bind(mainMod .. " + SHIFT + D", ipc("launcher windows"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("kitty -e yazi"))
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("Telegram"))
-hl.bind(mainMod .. " + ALT + V", ipc("launcher clipboard"))
+hl.bind(mainMod .. " + ALT + V", ipc("panel-toggle clipboard"))
 
 -- window actions
 hl.bind(mainMod .. " + Q", hl.dsp.window.close())
