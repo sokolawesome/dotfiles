@@ -31,13 +31,13 @@
 	]
 	edit = [
 		{ run = "${EDITOR} %s", desc = "Edit via micro", for = "unix", block = true },
-		{ run = 'code "$@"', desc = "Edit via VSCode", for = "unix", block = true },
+		{ run = 'code %s', desc = "Edit via VSCode", for = "unix", block = true },
 	]
 	extract = [{ run = "ya pub extract --list %s", desc = "Extract here" }]
 	open = [{ run = "open %s", desc = "Open", for = "macos" }, { run = "xdg-open %s1", desc = "Open", for = "linux" }]
 	play = [
 		{ run = "open %s", desc = "Play", for = "macos" },
-		{ run = 'mpv --force-window "$@"', desc = "Play", for = "linux" },
+		{ run = 'mpv --force-window %s', desc = "Play", for = "linux", orphan = true },
 	]
 	reveal = [
 		{ run = "clear; exiftool %s1; echo 'Press enter to exit'; read _", desc = "Show EXIF", for = "unix", block = true },
