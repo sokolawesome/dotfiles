@@ -1,0 +1,139 @@
+config-version = 2
+
+start-at-login = true
+
+auto-reload-config = true
+
+# 1-9 are general-purpose workspaces. Lettered workspaces are app-specific.
+persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "S", "T", "X", "Z"]
+
+enable-normalization-flatten-containers                         = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+default-root-container-layout      = 'tiles'
+default-root-container-orientation = 'auto'
+
+automatically-unhide-macos-hidden-apps = false
+
+on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+
+[gaps]
+    inner.horizontal = 8
+    inner.vertical   = 8
+    outer.left       = 8
+    outer.bottom     = 8
+    outer.top        = 8
+    outer.right      = 8
+
+[key-mapping]
+    preset = 'qwerty'
+
+[mode.main.binding]
+    alt-w       = 'exec-and-forget cur="$(aerospace list-workspaces --focused)"; aerospace close; aerospace workspace "$cur"'
+    alt-shift-w = 'exec-and-forget cur="$(aerospace list-workspaces --focused)"; aerospace close --quit-if-last-window; aerospace workspace "$cur"'
+
+    alt-h = 'focus left'
+    alt-j = 'focus down'
+    alt-k = 'focus up'
+    alt-l = 'focus right'
+
+    alt-shift-h = 'move left'
+    alt-shift-j = 'move down'
+    alt-shift-k = 'move up'
+    alt-shift-l = 'move right'
+
+    # General-purpose workspaces.
+    alt-1 = 'workspace 1'
+    alt-2 = 'workspace 2'
+    alt-3 = 'workspace 3'
+    alt-4 = 'workspace 4'
+    alt-5 = 'workspace 5'
+    alt-6 = 'workspace 6'
+    alt-7 = 'workspace 7'
+    alt-8 = 'workspace 8'
+    alt-9 = 'workspace 9'
+
+    alt-shift-1 = 'move-node-to-workspace 1'
+    alt-shift-2 = 'move-node-to-workspace 2'
+    alt-shift-3 = 'move-node-to-workspace 3'
+    alt-shift-4 = 'move-node-to-workspace 4'
+    alt-shift-5 = 'move-node-to-workspace 5'
+    alt-shift-6 = 'move-node-to-workspace 6'
+    alt-shift-7 = 'move-node-to-workspace 7'
+    alt-shift-8 = 'move-node-to-workspace 8'
+    alt-shift-9 = 'move-node-to-workspace 9'
+
+    # App workspaces: browser, Telegram, Discord, code, agents, terminal,
+    # Docker, and notes.
+    alt-b = 'workspace B'
+    alt-t = 'workspace T'
+    alt-d = 'workspace D'
+    alt-c = 'workspace C'
+    alt-a = 'workspace A'
+    alt-x = 'workspace X'
+    alt-z = 'workspace Z'
+    alt-s = 'workspace S'
+
+    alt-shift-b = 'move-node-to-workspace B'
+    alt-shift-t = 'move-node-to-workspace T'
+    alt-shift-d = 'move-node-to-workspace D'
+    alt-shift-c = 'move-node-to-workspace C'
+    alt-shift-a = 'move-node-to-workspace A'
+    alt-shift-x = 'move-node-to-workspace X'
+    alt-shift-z = 'move-node-to-workspace Z'
+    alt-shift-s = 'move-node-to-workspace S'
+
+    alt-f = 'fullscreen'
+
+    alt-slash = 'layout tiles horizontal vertical'
+    alt-comma = 'layout accordion horizontal vertical'
+
+# Keep utility-style macOS windows floating.
+[[on-window-detected]]
+    if.app-id = 'com.apple.systempreferences'
+    run       = 'layout floating'
+
+[[on-window-detected]]
+    if.app-id = 'com.apple.finder'
+    run       = 'layout floating'
+
+[[on-window-detected]]
+    if.app-id = 'com.apple.ActivityMonitor'
+    run       = 'layout floating'
+
+# Route applications to their dedicated workspaces.
+[[on-window-detected]]
+    if.app-id = 'app.zen-browser.zen'
+    run       = 'move-node-to-workspace B'
+
+[[on-window-detected]]
+    if.app-id = 'com.tdesktop.Telegram'
+    run       = 'move-node-to-workspace T'
+
+[[on-window-detected]]
+    if.app-id = 'com.hnc.Discord'
+    run       = 'move-node-to-workspace D'
+
+[[on-window-detected]]
+    if.app-id = 'com.microsoft.VSCode'
+    run       = 'move-node-to-workspace C'
+
+[[on-window-detected]]
+    if.app-id = 'com.openai.codex'
+    run       = 'move-node-to-workspace A'
+
+[[on-window-detected]]
+    if.app-id = 'com.anthropic.claudefordesktop'
+    run       = 'move-node-to-workspace A'
+
+[[on-window-detected]]
+    if.app-id = 'net.kovidgoyal.kitty'
+    run       = 'move-node-to-workspace X'
+
+[[on-window-detected]]
+    if.app-id = 'com.docker.docker'
+    run       = 'move-node-to-workspace Z'
+
+[[on-window-detected]]
+    if.app-id = 'md.obsidian'
+    run       = 'move-node-to-workspace S'

@@ -1,3 +1,5 @@
+status is-interactive || return
+
 alias cat='bat'
 alias bss='backup-system-state'
 alias mdf='manage-df'
