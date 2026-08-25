@@ -1,6 +1,4 @@
-fish_config theme choose "Rosé Pine Moon"
-
-set -Ux EDITOR "micro"
+set -Ux EDITOR micro
 set -Ux STARSHIP_CONFIG ~/.config/starship/starship.toml
 set -Ux MANPAGER "bat -plman"
 set -Ux DOTFILES_PATH ~/dotfiles
