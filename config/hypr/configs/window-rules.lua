@@ -32,6 +32,12 @@ hl.window_rule({
     size = { 1080, 920 },
 })
 
+hl.window_rule({
+    match = { class = "zen", title = "Library" },
+    float = true,
+    size = { 1580, 920 },
+})
+
 hl.window_rule({ match = { class = "blueman-manager" }, float = true })
 
 hl.window_rule({

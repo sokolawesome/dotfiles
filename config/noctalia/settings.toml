@@ -1,119 +1,251 @@
 config_version = 13
 
 [accessibility]
-ui_scale = 1.4000000134110451
+    ui_scale = 1.4
 
 [bar.default]
-end = [ "status", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "control-center", "session" ]
-margin_ends = 6
-padding = 18
-position = "bottom"
-radius = 0
-scale = 1.5000000149011612
-start = [ "launcher", "wallpaper", "workspaces", "media" ]
-thickness = 48
+    capsule              = true
+    capsule_padding      = 7.0
+    concave_edge_corners = false
+    end                  = ["status", "tray", "notifications", "network", "bluetooth", "volume", "control-center"]
+    font_family          = "IosevkaTerm Nerd Font Mono"
+    font_weight          = 600
+    margin_ends          = 0
+    padding              = 12
+    panel_overlap        = 0
+    position             = "bottom"
+    radius               = 0
+    scale                = 1.35
+    shadow               = false
+    start                = ["workspaces", "media"]
+    thickness            = 48
+    widget_spacing       = 10
+
+[brightness]
+    enable_ddcutil    = true
+    sync_all_monitors = true
+
+[control_center]
+    hidden_tabs = ["power"]
+
+    [control_center.calendar]
+        show_week_numbers = true
+
+    [[control_center.shortcuts]]
+        type = "wifi"
+
+    [[control_center.shortcuts]]
+        type = "bluetooth"
+
+    [[control_center.shortcuts]]
+        type = "caffeine"
+
+    [[control_center.shortcuts]]
+        type = "nightlight"
+
+    [[control_center.shortcuts]]
+        type = "notification"
 
 [desktop_widgets]
-enabled = false
+    enabled = false
+
+[idle]
+    pre_action_fade_seconds = 10
+
+[location]
+    address = "Moscow"
+
+[lockscreen]
+    monitors = ["DP-4"]
 
 [lockscreen_widgets]
-enabled = false
-schema_version = 2
-widget_order = [ "lockscreen-login-box@DP-4", "lockscreen-login-box@HDMI-A-2" ]
+    enabled        = false
+    schema_version = 2
+    widget_order   = ["lockscreen-login-box@DP-4", "lockscreen-login-box@HDMI-A-2"]
 
     [lockscreen_widgets.grid]
-    cell_size = 16
-    major_interval = 4
-    visible = true
+        cell_size      = 16
+        major_interval = 4
+        visible        = true
 
     [lockscreen_widgets.widget."lockscreen-login-box@DP-4"]
-    box_height = 196.0
-    box_width = 810.0
-    cx = 1720.0
-    cy = 1258.0
-    output = "DP-4"
-    placement_height = 1440.0
-    placement_width = 3440.0
-    rotation = 0.0
-    type = "login_box"
+        box_height       = 196.0
+        box_width        = 810.0
+        cx               = 1720.0
+        cy               = 1258.0
+        output           = "DP-4"
+        placement_height = 1440.0
+        placement_width  = 3440.0
+        rotation         = 0.0
+        type             = "login_box"
 
         [lockscreen_widgets.widget."lockscreen-login-box@DP-4".settings]
-        background_color = "surface_variant"
-        background_opacity = 0.88
-        background_radius = 12.0
-        center_password_text = false
-        input_opacity = 1.0
-        input_radius = 6.0
-        layout = "regular"
-        show_caps_lock = true
-        show_keyboard_layout = true
-        show_login_button = true
-        show_media = true
-        show_session_buttons = true
-        show_unlock_hint = true
-        show_weather = true
+            background_color     = "surface_variant"
+            background_opacity   = 0.88
+            background_radius    = 12.0
+            center_password_text = false
+            input_opacity        = 1.0
+            input_radius         = 6.0
+            layout               = "regular"
+            show_caps_lock       = true
+            show_keyboard_layout = true
+            show_login_button    = true
+            show_media           = true
+            show_session_buttons = true
+            show_unlock_hint     = true
+            show_weather         = true
 
     [lockscreen_widgets.widget."lockscreen-login-box@HDMI-A-2"]
-    box_height = 196.0
-    box_width = 810.0
-    cx = 1280.0
-    cy = 1258.0
-    output = "HDMI-A-2"
-    placement_height = 1440.0
-    placement_width = 2560.0
-    rotation = 0.0
-    type = "login_box"
+        box_height       = 196.0
+        box_width        = 810.0
+        cx               = 1280.0
+        cy               = 1258.0
+        output           = "HDMI-A-2"
+        placement_height = 1440.0
+        placement_width  = 2560.0
+        rotation         = 0.0
+        type             = "login_box"
 
         [lockscreen_widgets.widget."lockscreen-login-box@HDMI-A-2".settings]
-        background_color = "surface_variant"
-        background_opacity = 0.88
-        background_radius = 12.0
-        center_password_text = false
-        input_opacity = 1.0
-        input_radius = 6.0
-        layout = "regular"
-        show_caps_lock = true
-        show_keyboard_layout = true
-        show_login_button = true
-        show_media = true
-        show_session_buttons = true
-        show_unlock_hint = true
-        show_weather = true
+            background_color     = "surface_variant"
+            background_opacity   = 0.88
+            background_radius    = 12.0
+            center_password_text = false
+            input_opacity        = 1.0
+            input_radius         = 6.0
+            layout               = "regular"
+            show_caps_lock       = true
+            show_keyboard_layout = true
+            show_login_button    = true
+            show_media           = true
+            show_session_buttons = true
+            show_unlock_hint     = true
+            show_weather         = true
+
+[notification]
+    monitors = ["DP-4"]
+
+[osd]
+    monitors = ["DP-4"]
+    position = "bottom_center"
+
+    [osd.kinds]
+        media         = false
+        power_profile = false
 
 [plugin_settings."davemhammer/tailscale"]
-notify_on_peer_change = false
+    notify_on_peer_change = false
 
 [plugins]
-enabled = [ "davemhammer/tailscale" ]
+    enabled = ["davemhammer/tailscale"]
 
 [shell]
-font_family = "IosevkaTerm Nerd Font Mono"
-telemetry_enabled = true
+    font_family       = "IosevkaTerm Nerd Font Mono"
+    telemetry_enabled = true
+
+    [shell.panel]
+        session_placement   = "floating"
+        session_position    = "center"
+        wallpaper_placement = "floating"
+        wallpaper_position  = "center"
+
+    [shell.screenshot]
+        save_to_file = false
+
+    [shell.session]
+        grid_columns = 2
+
+        [[shell.session.actions]]
+            action            = "lock"
+            countdown_seconds = 0.0
+            enabled           = true
+            shortcut          = "1"
+            variant           = "default"
+
+        [[shell.session.actions]]
+            action            = "logout"
+            countdown_seconds = 0.0
+            enabled           = false
+            shortcut          = "2"
+            variant           = "default"
+
+        [[shell.session.actions]]
+            action            = "lock_and_suspend"
+            countdown_seconds = 0.0
+            enabled           = false
+            shortcut          = "3"
+            variant           = "default"
+
+        [[shell.session.actions]]
+            action            = "reboot"
+            countdown_seconds = 0.0
+            enabled           = true
+            shortcut          = "2"
+            variant           = "default"
+
+        [[shell.session.actions]]
+            action            = "shutdown"
+            countdown_seconds = 0.0
+            enabled           = true
+            shortcut          = "3"
+            variant           = "destructive"
+
+[system.monitor]
+    enabled = false
 
 [theme]
-mode = "dark"
-source = "wallpaper"
-wallpaper_scheme = "dysfunctional"
+    builtin           = "Kanagawa"
+    community_palette = "Everforest Material"
+    mode              = "dark"
+    source            = "builtin"
+    wallpaper_scheme  = "faithful"
 
     [theme.templates]
-    builtin_ids = [ "cava", "gtk3", "gtk4", "hyprland", "kitty", "qt" ]
-    community_ids = [ "zen-browser", "telegram", "yazi" ]
+        builtin_ids = ["btop", "cava", "gtk3", "gtk4", "hyprland", "kitty", "qt"]
+        community_ids = [
+            "zen-browser",
+            "telegram",
+            "micro",
+            "obsidian",
+            "vscode",
+            "fastfetch",
+            "zathura",
+            "bat",
+            "lazygit",
+            "yazi",
+        ]
 
 [wallpaper]
-directory = "/home/sokolawesome/Pictures/Wallpapers"
+    directory = "/home/sokolawesome/Pictures/Wallpapers"
 
     [wallpaper.default]
-    path = "/home/sokolawesome/Pictures/Wallpapers/artwork-fantasy-asian.jpg"
+        path = "/home/sokolawesome/Pictures/Wallpapers/space-galaxy-stars.jpg"
 
     [wallpaper.last]
-    path = "/home/sokolawesome/Pictures/Wallpapers/artwork-fantasy-asian.jpg"
+        path = "/home/sokolawesome/Pictures/Wallpapers/space-galaxy-stars.jpg"
 
     [wallpaper.monitors.DP-4]
-    path = "/home/sokolawesome/Pictures/Wallpapers/artwork-fantasy-asian.jpg"
+        path = "/home/sokolawesome/Pictures/Wallpapers/space-galaxy-stars.jpg"
 
     [wallpaper.monitors.HDMI-A-2]
-    path = "/home/sokolawesome/Pictures/Wallpapers/artwork-fantasy-asian.jpg"
+        path = "/home/sokolawesome/Pictures/Wallpapers/space-galaxy-stars.jpg"
+
+[widget.clock]
+    format = "{:%a %d %b %-I:%M %p}"
+
+[widget.media]
+    art_size           = 18
+    artist_first       = true
+    capsule            = true
+    hide_when_no_media = true
+    max_length         = 300
+    title_scroll       = "always"
+
+[widget.network]
+    show_label = false
 
 [widget.status]
-show_counts = false
-type = "davemhammer/tailscale:status"
+    capsule     = true
+    scale       = 0.9
+    show_counts = false
+    type        = "davemhammer/tailscale:status"
