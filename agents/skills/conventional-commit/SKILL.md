@@ -86,7 +86,7 @@ If unsure between feat and chore for a config change: new functionality is feat,
 
 ### Subject
 
-- Whole first line (`type(scope): subject`) is 72 characters or less.
+- Whole first line (`type(scope): subject`) is 50 characters or less.
 - Imperative mood: "add", not "added" or "adds".
 - Lowercase first letter, no trailing period.
 - Specific: say what changed, not "update config" or "fix stuff".
@@ -102,7 +102,7 @@ Test before writing one: read the subject alone. Does a reader learn what change
 Format when a body is needed:
 
 - bullet list, one change per line, each line starting with `- `
-- lowercase, imperative, no trailing period, 72 characters or less
+- lowercase, imperative, no trailing period, 72 characters or less per line
 - never wrap a bullet onto a second line, shorten it instead
 - no prose paragraphs, no explanations of why unless the user asks
 
