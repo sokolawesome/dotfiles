@@ -1,9 +1,8 @@
 bibata-cursor-git
 dualsensectl
 lazyssh-bin
-noctalia-shell
 proton-community-updater
-rsgain
+rmlint
 visual-studio-code-bin
 yay
 zen-browser-bin

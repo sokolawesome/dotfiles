@@ -4,12 +4,13 @@ amd-ucode
 base
 base-devel
 bat
-beets
+bleachbit
 blueman
 bluez-utils
 btop
 bun
 cava
+chromium
 cliphist
 ddcutil
 delve
@@ -23,7 +24,6 @@ eza
 fastfetch
 fd
 fish
-fisher
 fzf
 gamemode
 git
@@ -39,6 +39,7 @@ gtk4-layer-shell
 hyprland
 hyprland-qt-support
 hyprpicker
+imagemagick
 jq
 just
 kitty
@@ -59,6 +60,7 @@ linux-zen-headers
 lua-jsregexp
 man-db
 mangohud
+mediainfo
 micro
 mkvtoolnix-cli
 mpv
@@ -66,6 +68,7 @@ mpv-mpris
 ncdu
 network-manager-applet
 networkmanager
+noctalia
 noto-fonts-cjk
 noto-fonts-emoji
 npm
@@ -73,6 +76,7 @@ nvidia-open-dkms
 nvidia-utils
 nwg-look
 obsidian
+opencode
 otf-font-awesome
 pacman-contrib
 pamixer
@@ -87,6 +91,8 @@ playerctl
 polkit-kde-agent
 poppler
 poppler-data
+python-pytest
+python-rich
 qbittorrent
 qt5ct
 qt6-wayland
