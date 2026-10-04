@@ -1,0 +1,532 @@
+import json
+import pathlib
+
+import pytest
+from conftest import load_module
+
+mkv = load_module("mkv_strip_tracks")
+
+AUDIO = mkv.AUDIO
+SUBTITLES = mkv.SUBTITLES
+
+
+def track(kind, track_id, language="en", name="", codec="A_AAC", alias=""):
+    return mkv.Track(kind, track_id, language, alias, name, codec)
+
+
+def scan(path, tracks=(), error=""):
+    return mkv.FileScan(pathlib.Path(path) if path else None, tuple(tracks), error)
+
+
+def payload(*tracks):
+    entries = []
+    for t in tracks:
+        properties = {"codec_id": t.codec, "language": t.alias or t.language}
+        if t.language != "und":
+            properties["language_ietf"] = t.language
+        if t.name:
+            properties["track_name"] = t.name
+        entries.append({"id": t.track_id, "type": t.kind, "properties": properties})
+    return json.dumps({"tracks": entries})
+
+
+def test_language_of_prefers_ietf():
+    assert mkv.language_of({"language_ietf": "en", "language": "eng"}) == ("en", "eng")
+
+
+def test_language_of_falls_back_to_full():
+    assert mkv.language_of({"language": "eng"}) == ("eng", "eng")
+
+
+def test_language_of_defaults_to_und():
+    assert mkv.language_of({}) == ("und", "und")
+
+
+def test_track_speaks_accepts_either_form():
+    assert track(AUDIO, 1, "en", alias="eng").speaks("en")
+    assert track(AUDIO, 1, "en", alias="eng").speaks("eng")
+    assert not track(AUDIO, 1, "en", alias="eng").speaks("jpn")
+
+
+def test_parse_tracks_reads_ids_and_names():
+    tracks = mkv.parse_tracks(
+        payload(
+            track("video", 0, codec="V_MPEG4"),
+            track(AUDIO, 1, "en", alias="eng"),
+            track(SUBTITLES, 5, "ja", alias="jpn", name="Signs"),
+        )
+    )
+
+    assert [t.track_id for t in tracks] == [0, 1, 5]
+    assert tracks[2].name == "Signs"
+    assert tracks[1].language == "en"
+
+
+def test_parse_tracks_replaces_pipes_in_names():
+    assert mkv.parse_tracks(payload(track(AUDIO, 1, name="a|b")))[0].name == "a/b"
+
+
+def test_parse_tracks_defaults_missing_ids():
+    assert mkv.parse_tracks('{"tracks": [{"type": "audio"}]}')[0].track_id == -1
+
+
+def test_scan_files_finds_mkv_in_a_directory(tmp_path):
+    (tmp_path / "a.mkv").write_text("x")
+    (tmp_path / "b.mp4").write_text("x")
+    (tmp_path / "c.mkv").write_text("x")
+
+    found = mkv.scan_files(tmp_path, [])
+
+    assert [p.name for p in found] == ["a.mkv", "c.mkv"]
+
+
+def test_scan_files_ignores_nested(tmp_path):
+    (tmp_path / "a.mkv").write_text("x")
+    nested = tmp_path / "sub"
+    nested.mkdir()
+    (nested / "b.mkv").write_text("x")
+
+    assert [p.name for p in mkv.scan_files(tmp_path, [])] == ["a.mkv"]
+
+
+def test_scan_files_rejects_a_missing_named_file(tmp_path):
+    with pytest.raises(mkv.StripError) as error:
+        mkv.scan_files(tmp_path, ["nope.mkv"])
+
+    assert "not a file" in str(error.value)
+
+
+def test_scan_files_rejects_a_non_mkv(tmp_path):
+    (tmp_path / "a.mp4").write_text("x")
+
+    with pytest.raises(mkv.StripError) as error:
+        mkv.scan_files(tmp_path, ["a.mp4"])
+
+    assert "not an .mkv file" in str(error.value)
+
+
+def test_union_of_groups_by_identity():
+    scans = [
+        scan(None, [track(AUDIO, 1, "en"), track(AUDIO, 2, "ja")]),
+        scan(None, [track(AUDIO, 1, "en"), track(SUBTITLES, 3, "en")]),
+    ]
+
+    union = mkv.union_of(scans)
+
+    assert set(union) == {
+        mkv.Selection(AUDIO, "en"),
+        mkv.Selection(AUDIO, "ja"),
+        mkv.Selection(SUBTITLES, "en"),
+    }
+
+
+def test_union_of_separates_named_tracks():
+    scans = [scan(None, [track(AUDIO, 1, "en"), track(AUDIO, 2, "en", "Commentary")])]
+
+    union = mkv.union_of(scans)
+
+    assert len(union) == 2
+    assert any(s.name == "Commentary" for s in union)
+
+
+def test_union_of_ignores_video():
+    assert mkv.union_of([scan(None, [track("video", 0)])]) == []
+
+
+def test_presence_of_counts_files():
+    scans = [
+        scan("a", [track(AUDIO, 1, "en")]),
+        scan("b", [track(AUDIO, 2, "en")]),
+        scan("c", [track(AUDIO, 3, "ja")]),
+    ]
+
+    assert mkv.presence_of(mkv.Selection(AUDIO, "en"), scans) == 2
+
+
+def test_matches_for_uses_identity_not_position():
+    first = scan("a", [track(AUDIO, 1, "en"), track(AUDIO, 2, "ja")])
+    second = scan("b", [track(AUDIO, 1, "ja"), track(AUDIO, 2, "en")])
+
+    picks = mkv.matches_for(mkv.Selection(AUDIO, "en"), first)
+    others = mkv.matches_for(mkv.Selection(AUDIO, "en"), second)
+
+    assert [t.track_id for t in picks] == [1]
+    assert [t.track_id for t in others] == [2]
+
+
+def test_matches_for_rejects_the_wrong_language_across_layouts():
+    target = scan("b", [track(AUDIO, 1, "ja"), track(AUDIO, 2, "en")])
+
+    assert [t.track_id for t in mkv.matches_for(mkv.Selection(AUDIO, "en"), target)] == [2]
+
+
+def test_matches_for_accepts_a_named_track():
+    target = scan("a", [track(AUDIO, 1, "en"), track(AUDIO, 2, "en", "Commentary")])
+
+    named = mkv.matches_for(mkv.Selection(AUDIO, "en", "Commentary"), target)
+
+    assert [t.track_id for t in named] == [2]
+
+
+def test_matches_for_returns_nothing_when_absent():
+    assert mkv.matches_for(mkv.Selection(AUDIO, "jpn"), scan("a", [track(AUDIO, 1, "en")])) == []
+
+
+def test_resolve_picks_keeps_a_single_candidate():
+    chosen = mkv.resolve_picks([mkv.Selection(AUDIO, "en")], scan("a", [track(AUDIO, 4, "en")]), False)
+
+    assert [t.track_id for t in chosen] == [4]
+
+
+def test_resolve_picks_takes_the_first_without_asking():
+    target = scan("a", [track(AUDIO, 1, "en"), track(AUDIO, 2, "en")])
+
+    chosen = mkv.resolve_picks([mkv.Selection(AUDIO, "en")], target, False)
+
+    assert [t.track_id for t in chosen] == [1]
+
+
+def test_resolve_picks_asks_for_each_ambiguous_file(monkeypatch, capsys):
+    asked = []
+
+    def fake_prompt(question=""):
+        asked.append(question)
+        return "2"
+
+    monkeypatch.setattr(mkv, "Prompt", type("P", (), {"ask": staticmethod(fake_prompt)}))
+    scans = [
+        scan("a", [track(AUDIO, 1, "en"), track(AUDIO, 5, "en")]),
+        scan("b", [track(AUDIO, 2, "en"), track(AUDIO, 9, "en")]),
+    ]
+
+    chosen = [mkv.resolve_picks([mkv.Selection(AUDIO, "en")], s, True) for s in scans]
+    capsys.readouterr()
+
+    assert len(asked) == 2
+    assert [t.track_id for t in chosen[0]] == [5]
+    assert [t.track_id for t in chosen[1]] == [9]
+
+
+def test_pick_from_candidates_honours_the_number(monkeypatch, capsys):
+    monkeypatch.setattr(mkv, "Prompt", type("P", (), {"ask": staticmethod(lambda q="": "2")}))
+    target = scan("a", [track(AUDIO, 1, "en"), track(AUDIO, 7, "en")])
+
+    result = mkv.pick_from_candidates(mkv.Selection(AUDIO, "en"), target, mkv.matches_for(mkv.Selection(AUDIO, "en"), target))
+    capsys.readouterr()
+
+    assert result.track_id == 7
+    assert mkv.matches_for(mkv.Selection(AUDIO, "en"), target)
+
+
+def test_pick_from_candidates_falls_back_to_the_first(monkeypatch, capsys):
+    monkeypatch.setattr(mkv, "Prompt", type("P", (), {"ask": staticmethod(lambda q="": "junk")}))
+    target = scan("a", [track(AUDIO, 3, "en"), track(AUDIO, 7, "en")])
+
+    result = mkv.pick_from_candidates(mkv.Selection(AUDIO, "en"), target, mkv.matches_for(mkv.Selection(AUDIO, "en"), target))
+    capsys.readouterr()
+
+    assert result.track_id == 3
+
+
+def test_build_plan_records_missing():
+    scans = [
+        scan("a", [track(AUDIO, 1, "en")]),
+        scan("b", [track(AUDIO, 1, "ja")]),
+    ]
+
+    plans = mkv.build_plan(scans, [mkv.Selection(AUDIO, "en")], False)
+
+    assert plans[0].missing == ()
+    assert plans[1].missing == (mkv.Selection(AUDIO, "en"),)
+
+
+def test_build_plan_resolves_each_file_independently():
+    scans = [
+        scan("a", [track(AUDIO, 1, "en"), track(AUDIO, 2, "ja")]),
+        scan("b", [track(AUDIO, 1, "ja"), track(AUDIO, 2, "en")]),
+    ]
+
+    plans = mkv.build_plan(scans, [mkv.Selection(AUDIO, "en")], False)
+
+    assert [p.ids_for(AUDIO) for p in plans] == [[1], [2]]
+
+
+def test_strip_command_uses_the_right_flag_per_kind():
+    plan = mkv.FilePlan(pathlib.Path("a.mkv"), (track(AUDIO, 1), track(SUBTITLES, 4)), ())
+
+    command = mkv.strip_command(plan, "mkvmerge")
+
+    assert "--audio-tracks" in command
+    assert "--subtitle-tracks" in command
+    assert "--subtitles-tracks" not in command
+
+
+def test_strip_command_omits_a_kind_with_nothing_kept():
+    plan = mkv.FilePlan(pathlib.Path("a.mkv"), (track(AUDIO, 1),), ())
+
+    command = mkv.strip_command(plan, "mkvmerge")
+
+    assert "--subtitle-tracks" not in command
+    assert "--no-subtitles" not in command
+
+
+def test_strip_command_never_emits_both_a_list_and_a_no_flag():
+    plan = mkv.FilePlan(pathlib.Path("a.mkv"), (), ())
+
+    command = mkv.strip_command(plan, "mkvmerge")
+
+    assert "--no-audio" not in command
+    assert "--no-subtitles" not in command
+
+
+def test_strip_one_replaces_the_original(tmp_path, monkeypatch):
+    source = tmp_path / "a.mkv"
+    source.write_text("original")
+
+    def fake_run(command, **kwargs):
+        temp = [part for part in command if part.endswith(".stripping.mkv")][0]
+        (tmp_path / "a.stripping.mkv").write_text("stripped")
+        return type("F", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(mkv.subprocess, "run", fake_run)
+
+    ok, detail = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge")
+
+    assert ok
+    assert source.read_text() == "stripped"
+    assert list(tmp_path.iterdir()) == [source]
+
+
+def test_strip_one_keeps_the_original_on_failure(tmp_path, monkeypatch):
+    source = tmp_path / "a.mkv"
+    source.write_text("original")
+
+    def fake_run(command, **kwargs):
+        temp = [part for part in command if part.endswith(".stripping.mkv")][0]
+        (tmp_path / "a.stripping.mkv").write_text("half")
+        return type("F", (), {"returncode": 2, "stdout": "", "stderr": "boom\n"})()
+
+    monkeypatch.setattr(mkv.subprocess, "run", fake_run)
+
+    ok, detail = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge")
+
+    assert not ok
+    assert detail == "boom"
+    assert source.read_text() == "original"
+    assert list(tmp_path.iterdir()) == [source]
+
+
+def test_strip_one_reports_missing_output(tmp_path, monkeypatch):
+    source = tmp_path / "a.mkv"
+    source.write_text("original")
+
+    monkeypatch.setattr(
+        mkv.subprocess,
+        "run",
+        lambda command, **kwargs: type("F", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+    )
+
+    ok, detail = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge")
+
+    assert not ok
+    assert "no output" in detail
+    assert source.read_text() == "original"
+
+
+def test_find_mkvmerge_fails_when_absent(monkeypatch):
+    monkeypatch.setattr(mkv.shutil, "which", lambda name: None)
+
+    with pytest.raises(mkv.StripError) as error:
+        mkv.find_mkvmerge()
+
+    assert "mkvmerge not found" in str(error.value)
+
+
+def test_selections_from_flags_reads_both_kinds():
+    args = type("A", (), {"keep_audio": "en, ja", "keep_subs": "eng"})()
+
+    picks = mkv.selections_from_flags(args)
+
+    assert picks == [
+        mkv.Selection(AUDIO, "en"),
+        mkv.Selection(AUDIO, "ja"),
+        mkv.Selection(SUBTITLES, "eng"),
+    ]
+
+
+def test_selections_from_flags_is_none_when_empty():
+    args = type("A", (), {"keep_audio": "", "keep_subs": ""})()
+
+    assert mkv.selections_from_flags(args) is None
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (1073741824, "1.00 GiB"),
+        (1048576, "1.00 MiB"),
+        (512, "512 B"),
+        (0, "0 B"),
+    ],
+)
+def test_format_size(value, expected):
+    assert mkv.format_size(value) == expected
+
+
+def test_size_of_ignores_missing_files(tmp_path):
+    (tmp_path / "a").write_text("12345")
+
+    assert mkv.size_of([tmp_path / "a", tmp_path / "gone"]) == 5
+
+
+def test_probe_reports_unreadable_files(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        mkv.subprocess,
+        "run",
+        lambda command, **kwargs: type("F", (), {"returncode": 1, "stdout": "", "stderr": "bad file\n"})(),
+    )
+
+    result = mkv.probe(tmp_path / "x.mkv", "mkvmerge")
+
+    assert result.error == "bad file"
+    assert not result.readable()
+
+
+def test_probe_reports_bad_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        mkv.subprocess,
+        "run",
+        lambda command, **kwargs: type("F", (), {"returncode": 0, "stdout": "not json", "stderr": ""})(),
+    )
+
+    result = mkv.probe(tmp_path / "x.mkv", "mkvmerge")
+
+    assert "unreadable" in result.error
+
+
+def test_main_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
+    (tmp_path / "a.mkv").write_text("x")
+    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+    monkeypatch.setattr(
+        mkv.subprocess,
+        "run",
+        lambda command, **kwargs: type("F", (), {"returncode": 0, "stdout": payload(track(AUDIO, 1, "en")), "stderr": ""})(),
+    )
+
+    code = mkv.main(["--dry-run", "--keep-audio", "en", "--directory", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "dry run" in out
+    assert (tmp_path / "a.mkv").read_text() == "x"
+
+
+def test_main_reports_no_mkv_files(tmp_path, capsys):
+    code = mkv.main(["--directory", str(tmp_path)])
+
+    assert code == 1
+    assert "no .mkv files" in capsys.readouterr().out
+
+
+def test_main_reports_a_missing_mkvmerge(tmp_path, capsys):
+    (tmp_path / "a.mkv").write_text("x")
+    code = mkv.main(["--directory", str(tmp_path)])
+
+    assert code == 1
+    assert "no .mkv files" not in capsys.readouterr().out
+
+
+def test_main_strips_when_confirmed(tmp_path, monkeypatch, capsys):
+    source = tmp_path / "a.mkv"
+    source.write_text("original")
+    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+    monkeypatch.setattr(mkv, "Confirm", type("C", (), {"ask": staticmethod(lambda *a, **k: True)}))
+    monkeypatch.setattr(
+        mkv.subprocess,
+        "run",
+        lambda command, **kwargs: type("F", (), {"returncode": 0, "stdout": payload(track(AUDIO, 1, "en")), "stderr": ""})(),
+    )
+    calls = []
+
+    def fake_strip(plan, mkvmerge):
+        calls.append(plan.path)
+        source.write_text("stripped")
+        return True, ""
+
+    monkeypatch.setattr(mkv, "strip_one", fake_strip)
+
+    code = mkv.main(["--keep-audio", "en", "--directory", str(tmp_path)])
+
+    assert code == 0
+    assert calls == [source]
+    assert source.read_text() == "stripped"
+    assert "done - 1 files stripped" in capsys.readouterr().out
+
+
+def test_main_cancels_when_declined(tmp_path, monkeypatch, capsys):
+    (tmp_path / "a.mkv").write_text("x")
+    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+    monkeypatch.setattr(mkv, "Confirm", type("C", (), {"ask": staticmethod(lambda *a, **k: False)}))
+    monkeypatch.setattr(
+        mkv,
+        "probe",
+        lambda path, mkvmerge: scan(path, (track(AUDIO, 1, "en"),)),
+    )
+
+    code = mkv.main(["--keep-audio", "en", "--directory", str(tmp_path)])
+
+    assert code == 1
+    assert "cancelled" in capsys.readouterr().out
+
+
+def test_main_skips_files_that_lack_a_track(tmp_path, monkeypatch, capsys):
+    (tmp_path / "a.mkv").write_text("x")
+    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+    monkeypatch.setattr(mkv, "Confirm", type("C", (), {"ask": staticmethod(lambda *a, **k: True)}))
+    monkeypatch.setattr(
+        mkv,
+        "probe",
+        lambda path, mkvmerge: scan(path, (track(AUDIO, 1, "ja"),)),
+    )
+    monkeypatch.setattr(
+        mkv,
+        "strip_one",
+        lambda plan, mkvmerge: pytest.fail("must not strip a skipped file"),
+    )
+
+    code = mkv.main(["--keep-audio", "en", "--skip-missing", "--directory", str(tmp_path)])
+
+    assert code == 0
+    assert "no file has every requested track" in capsys.readouterr().out
+
+
+def test_main_reports_an_unreadable_file(tmp_path, monkeypatch, capsys):
+    (tmp_path / "a.mkv").write_text("x")
+    (tmp_path / "b.mkv").write_text("x")
+    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+
+    def fake_probe(path, mkvmerge):
+        if path.name == "a.mkv":
+            return scan(path, (), "broken")
+        return scan(path, (track(AUDIO, 1, "en"),))
+
+    monkeypatch.setattr(mkv, "probe", fake_probe)
+
+    code = mkv.main(["--dry-run", "--keep-audio", "en", "--directory", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "unreadable" in out
+    assert "broken" in out
+
+
+def test_main_handles_ctrl_c(monkeypatch, capsys):
+    def boom():
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(mkv, "find_mkvmerge", boom)
+
+    code = mkv.main(["--directory", "."])
+
+    assert code == 130
+    assert "cancelled" in capsys.readouterr().out

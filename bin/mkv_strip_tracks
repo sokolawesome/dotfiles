@@ -1,0 +1,466 @@
+#!/usr/bin/env python3
+"""Strip audio and subtitle tracks from MKV files, matching tracks by identity rather than position."""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from rich.console import Console
+from rich.markup import escape
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+from rich.prompt import Confirm, Prompt
+from rich.table import Table
+
+console = Console()
+
+QUESTION = "bold cyan"
+KEEP = "bold green"
+DROP = "yellow"
+FAIL = "red"
+DIM = "dim"
+
+MKV_SUFFIX = ".mkv"
+TEMP_SUFFIX = ".stripping"
+AUDIO = "audio"
+SUBTITLES = "subtitles"
+SELECTABLE_TYPES = (AUDIO, SUBTITLES)
+MKVMERGE_FLAGS = {AUDIO: "--audio-tracks", SUBTITLES: "--subtitle-tracks"}
+
+
+class StripError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Track:
+    kind: str
+    track_id: int
+    language: str
+    alias: str
+    name: str
+    codec: str
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        return (self.kind, self.language, self.name)
+
+    @property
+    def label(self) -> str:
+        return self.name or "unnamed"
+
+    def speaks(self, wanted: str) -> bool:
+        return wanted in (self.language.lower(), self.alias.lower())
+
+
+@dataclass(frozen=True)
+class FileScan:
+    path: Path
+    tracks: tuple[Track, ...]
+    error: str = ""
+
+    def readable(self) -> bool:
+        return not self.error
+
+
+@dataclass(frozen=True)
+class Selection:
+    kind: str
+    language: str
+    name: str = ""
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        return (self.kind, self.language, self.name)
+
+
+@dataclass(frozen=True)
+class FilePlan:
+    path: Path
+    keep: tuple[Track, ...]
+    missing: tuple[Selection, ...]
+
+    def ids_for(self, kind: str) -> list[int]:
+        return [track.track_id for track in self.keep if track.kind == kind]
+
+    def holds(self, kind: str) -> bool:
+        return any(track.kind == kind for track in self.keep)
+
+
+def find_mkvmerge() -> str:
+    found = shutil.which("mkvmerge")
+    if found is None:
+        raise StripError("mkvmerge not found, install with 'sudo pacman -S mkvtoolnix-cli'")
+    return found
+
+
+def language_of(properties: dict) -> tuple[str, str]:
+    ietf = (properties.get("language_ietf") or "").strip()
+    full = (properties.get("language") or "").strip()
+    if not ietf and not full:
+        return ("und", "und")
+    if not full:
+        full = ietf
+    if not ietf:
+        ietf = full
+    return (ietf.lower(), full.lower())
+
+
+def parse_tracks(payload: str) -> tuple[Track, ...]:
+    document = json.loads(payload)
+    tracks = []
+    for entry in document.get("tracks", []):
+        properties = entry.get("properties", {})
+        ietf, full = language_of(properties)
+        tracks.append(
+            Track(
+                kind=entry.get("type", ""),
+                track_id=int(entry.get("id", -1)),
+                language=ietf,
+                alias=full,
+                name=(properties.get("track_name") or "").replace("|", "/"),
+                codec=properties.get("codec_id", ""),
+            )
+        )
+    return tuple(tracks)
+
+
+def probe(path: Path, mkvmerge: str) -> FileScan:
+    finished = subprocess.run([mkvmerge, "-J", str(path)], capture_output=True, text=True, check=False)
+    if finished.returncode != 0:
+        detail = finished.stderr.strip().splitlines()
+        return FileScan(path, (), detail[0] if detail else "could not read tracks")
+    try:
+        return FileScan(path, parse_tracks(finished.stdout))
+    except (json.JSONDecodeError, TypeError, ValueError) as error:
+        return FileScan(path, (), f"unreadable track list: {error}")
+
+
+def scan_files(directory: Path, names: list[str]) -> list[Path]:
+    if not names:
+        return [p for p in sorted(directory.iterdir()) if p.is_file() and p.suffix == MKV_SUFFIX]
+    chosen = [directory / name if not Path(name).is_absolute() and (directory / name).exists() else Path(name) for name in names]
+    missing = [p.name for p in chosen if not p.is_file()]
+    if missing:
+        raise StripError(f"not a file: {', '.join(missing)}")
+    wrong = [p.name for p in chosen if p.suffix != MKV_SUFFIX]
+    if wrong:
+        raise StripError(f"not an .mkv file: {', '.join(wrong)}")
+    return chosen
+
+
+def collect(paths: list[Path], mkvmerge: str) -> list[FileScan]:
+    return [probe(path, mkvmerge) for path in paths]
+
+
+def union_of(scans: list[FileScan]) -> list[Selection]:
+    keys: dict[tuple[str, str, str], None] = {}
+    for scan in scans:
+        for track in scan.tracks:
+            if track.kind in SELECTABLE_TYPES:
+                keys.setdefault(track.key, None)
+    return [Selection(*key) for key in keys]
+
+
+def presence_of(selection: Selection, scans: list[FileScan]) -> int:
+    return sum(1 for scan in scans if any(track.key == selection.key for track in scan.tracks))
+
+
+def matches_for(selection: Selection, scan: FileScan) -> list[Track]:
+    if selection.name:
+        return [
+            track
+            for track in scan.tracks
+            if track.kind == selection.kind and track.name == selection.name and track.speaks(selection.language)
+        ]
+    return [track for track in scan.tracks if track.kind == selection.kind and track.speaks(selection.language)]
+
+
+def choose_interactively(scans: list[FileScan], union: list[Selection]) -> list[Selection]:
+    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table.add_column(justify="right", width=4)
+    table.add_column(width=10)
+    table.add_column(width=10)
+    table.add_column(overflow="ellipsis")
+    table.add_column(justify="right", width=8)
+    for number, selection in enumerate(union, start=1):
+        table.add_row(
+            str(number),
+            f"[{KEEP}]{escape(selection.kind)}[/]",
+            escape(selection.language),
+            escape(selection.name or "unnamed"),
+            f"[{DIM}]{presence_of(selection, scans)} files[/]",
+        )
+    console.print(Panel(table, title="tracks across all files", border_style="cyan", padding=(0, 1)))
+
+    highest = len(union)
+    while True:
+        answer = Prompt.ask(
+            f"[{QUESTION}]keep which[/] [dim](numbers, 'all', 'none')[/]"
+        ).strip()
+        if answer.lower() == "all":
+            return list(union)
+        if answer.lower() in ("none", ""):
+            return []
+        parts = answer.replace(",", " ").split()
+        if not all(part.isdigit() and 1 <= int(part) <= highest for part in parts):
+            console.print(f"[{FAIL}]pick numbers between 1 and {highest}[/]")
+            continue
+        return [union[int(part) - 1] for part in parts]
+
+
+def resolve_picks(
+    selections: list[Selection],
+    scan: FileScan,
+    ask: bool,
+) -> list[Track]:
+    chosen = []
+    for selection in selections:
+        candidates = matches_for(selection, scan)
+        if not candidates:
+            continue
+        if len(candidates) > 1 and ask:
+            chosen.append(pick_from_candidates(selection, scan, candidates))
+        else:
+            chosen.append(candidates[0])
+    return chosen
+
+
+def pick_from_candidates(selection: Selection, scan: FileScan, candidates: list[Track]) -> Track:
+    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table.add_column(justify="right", width=4)
+    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="ellipsis")
+    for number, track in enumerate(candidates, start=1):
+        table.add_row(str(number), escape(track.label), f"[{DIM}]{escape(track.codec)}[/]")
+    console.print(
+        Panel(
+            table,
+            title=f"{scan.path.name}: {len(candidates)} {selection.kind} tracks match {selection.language} {selection.name or 'unnamed'}",
+            border_style=FAIL,
+            padding=(0, 1),
+        )
+    )
+    answer = Prompt.ask(f"[{QUESTION}]keep which one[/]").strip()
+    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+        return candidates[int(answer) - 1]
+    return candidates[0]
+
+
+def build_plan(scans: list[FileScan], selections: list[Selection], ask: bool) -> list[FilePlan]:
+    plans = []
+    for scan in scans:
+        keep = resolve_picks(selections, scan, ask)
+        missing = tuple(s for s in selections if not matches_for(s, scan))
+        plans.append(FilePlan(scan.path, tuple(keep), missing))
+    return plans
+
+
+def strip_command(plan: FilePlan, mkvmerge: str) -> list[str]:
+    temp = plan.path.with_name(plan.path.stem + TEMP_SUFFIX + MKV_SUFFIX)
+    command = [mkvmerge, "-o", str(temp)]
+    for kind in SELECTABLE_TYPES:
+        ids = plan.ids_for(kind)
+        if ids:
+            command += [MKVMERGE_FLAGS[kind], ",".join(str(i) for i in ids)]
+    command.append(str(plan.path))
+    return command
+
+
+def strip_one(plan: FilePlan, mkvmerge: str) -> tuple[bool, str]:
+    temp = plan.path.with_name(plan.path.stem + TEMP_SUFFIX + MKV_SUFFIX)
+    try:
+        finished = subprocess.run(strip_command(plan, mkvmerge), capture_output=True, text=True, check=False)
+    except OSError as error:
+        return False, str(error)
+    if finished.returncode != 0:
+        temp.unlink(missing_ok=True)
+        detail = finished.stderr.strip().splitlines()
+        return False, detail[0] if detail else f"mkvmerge exited {finished.returncode}"
+    if not temp.is_file():
+        return False, "mkvmerge produced no output file"
+    os.replace(temp, plan.path)
+    return True, ""
+
+
+def size_of(paths: list[Path]) -> int:
+    total = 0
+    for path in paths:
+        try:
+            total += path.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def format_size(value: int) -> str:
+    if value >= 1073741824:
+        return f"{value / 1073741824:.2f} GiB"
+    if value >= 1048576:
+        return f"{value / 1048576:.2f} MiB"
+    return f"{value} B"
+
+
+def build_plan_table(plans: list[FilePlan], processed: set[Path]) -> Table:
+    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table.add_column(overflow="ellipsis")
+    table.add_column(justify="right", width=8)
+    table.add_column(justify="right", width=8)
+    table.add_column(overflow="ellipsis")
+    for plan in plans:
+        if plan.path in processed:
+            audio = len(plan.ids_for(AUDIO))
+            subs = len(plan.ids_for(SUBTITLES))
+            note = f"[{DIM}]clean[/]"
+        else:
+            audio = subs = 0
+            note = f"[{DROP}]skipped, {len(plan.missing)} missing[/]"
+        table.add_row(
+            escape(plan.path.name),
+            f"[{KEEP}]{audio}[/]",
+            f"[{KEEP}]{subs}[/]",
+            note,
+        )
+    return table
+
+
+def build_problem_table(scans: list[FileScan]) -> Table:
+    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="fold")
+    for scan in scans:
+        if scan.error:
+            table.add_row(escape(scan.path.name), f"[{FAIL}]{escape(scan.error)}[/]")
+    return table
+
+
+def report_unreadable(scans: list[FileScan]) -> None:
+    if any(not scan.readable() for scan in scans):
+        console.print(Panel(build_problem_table(scans), title="unreadable", border_style=FAIL, padding=(0, 1)))
+
+
+def selections_from_flags(args: argparse.Namespace) -> list[Selection] | None:
+    picks = []
+    for spec in args.keep_audio.split(","):
+        if spec.strip():
+            picks.append(Selection(AUDIO, spec.strip().lower()))
+    for spec in args.keep_subs.split(","):
+        if spec.strip():
+            picks.append(Selection(SUBTITLES, spec.strip().lower()))
+    return picks or None
+
+
+def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
+    failures = 0
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("stripping", total=len(plans))
+        for plan in plans:
+            progress.update(task, description=escape(plan.path.name))
+            ok, detail = strip_one(plan, mkvmerge)
+            if not ok:
+                failures += 1
+                console.print(f"[{FAIL}]x[/] {escape(plan.path.name)}: {escape(detail)}")
+            progress.advance(task)
+    return failures
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="mkv_strip_tracks",
+        description="strip audio and subtitle tracks from mkv files, matching by language and name",
+    )
+    parser.add_argument("files", nargs="*", help="files to process, defaults to every .mkv in the directory")
+    parser.add_argument("--keep-audio", default="", metavar="LANGS", help="comma separated audio languages")
+    parser.add_argument("--keep-subs", default="", metavar="LANGS", help="comma separated subtitle languages")
+    parser.add_argument("--skip-missing", action="store_true", help="leave files that lack a requested track alone")
+    parser.add_argument("-d", "--dry-run", action="store_true", help="show the plan without stripping")
+    parser.add_argument("--directory", type=Path, default=Path("."), help="directory to scan")
+    return parser
+
+
+def run(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    try:
+        mkvmerge = find_mkvmerge()
+        paths = scan_files(args.directory, args.files)
+    except StripError as error:
+        console.print(f"[{FAIL}]error:[/] {escape(str(error))}")
+        return 1
+
+    if not paths:
+        console.print(f"[{FAIL}]error:[/] no .mkv files in {escape(str(args.directory))}")
+        return 1
+
+    scans = collect(paths, mkvmerge)
+    report_unreadable(scans)
+    readable = [scan for scan in scans if scan.readable()]
+    if not readable:
+        return 1
+
+    union = union_of(readable)
+    if not union:
+        console.print("[red]error:[/] no audio or subtitle tracks found")
+        return 1
+
+    from_flags = selections_from_flags(args)
+    ask = from_flags is None
+    selections = from_flags if from_flags is not None else choose_interactively(readable, union)
+    if not selections:
+        console.print("[yellow]nothing selected[/]")
+        return 0
+
+    plans = build_plan(readable, selections, ask)
+    processed = {plan.path for plan in plans if not (args.skip_missing and plan.missing)}
+    console.print(Panel(build_plan_table(plans, processed), title="plan", border_style="cyan", padding=(0, 1)))
+
+    todo = [plan for plan in plans if plan.path in processed]
+
+    if args.dry_run:
+        console.print(f"[{DROP}]dry run, nothing stripped[/]")
+        return 0
+
+    if not todo:
+        console.print("[yellow]no file has every requested track[/]")
+        return 0
+
+    if not Confirm.ask(f"[{QUESTION}]strip {len(todo)} file(s)?[/]", default=False, console=console):
+        console.print("[yellow]cancelled[/]")
+        return 1
+
+    before = size_of([plan.path for plan in todo])
+    failures = strip_all(todo, mkvmerge)
+    after = size_of([plan.path for plan in todo])
+
+    console.print()
+    if failures:
+        console.print(f"[{FAIL}]done with {failures} error(s)[/]")
+    else:
+        console.print(f"[{KEEP}]done - {len(todo)} files stripped[/]")
+    console.print(f"[{QUESTION}]before:[/] {format_size(before)}")
+    console.print(f"[{QUESTION}]after:  [/] {format_size(after)}")
+    console.print(f"[{QUESTION}]saved:  [/] {format_size(before - after)}")
+    return 1 if failures else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        return run(argv)
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[yellow]cancelled[/]")
+        return 130
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
