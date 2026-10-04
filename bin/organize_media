@@ -1,0 +1,335 @@
+#!/usr/bin/env python3
+"""Create the tvdb tagged directory layout for movies and tv shows."""
+
+import argparse
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from rich.console import Console
+from rich.markup import escape
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
+from rich.tree import Tree
+
+console = Console()
+
+QUESTION = "bold cyan"
+CREATED = "bold green"
+EXISTS = "yellow"
+PLAIN = "white"
+
+SEASON_WIDTH = 2
+SEASON_COUNT = re.compile(r"[0-9]+-[0-9]+")
+SINGLE_SEASON = re.compile(r"[0-9]+")
+MAIN_FOLDER = re.compile(r"^(?P<name>.+) \((?P<year>[^)]+)\) \[tvdbid-(?P<id>[^\]]+)\]$")
+SEASON_FOLDER = re.compile(r"^Season (?P<season>[0-9]+) \[tvdbid-(?P<id>[^\]]+)\]$")
+
+MOVIE = "movie"
+SHOW = "show"
+CONTENT_TYPES = (MOVIE, SHOW)
+
+
+class OrganizeMediaError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class SeasonPlan:
+    number: str
+    directory: Path
+
+
+@dataclass(frozen=True)
+class ShowPlan:
+    content_type: str
+    title: str
+    year: str
+    show_id: str
+    seasons: tuple[SeasonPlan, ...]
+    main_directory: Path
+
+    def directories(self) -> list[Path]:
+        return [self.main_directory, *(s.directory for s in self.seasons)]
+
+
+def pad_season(value: int) -> str:
+    return f"{value:0{SEASON_WIDTH}d}"
+
+
+def parse_season_range(spec: str) -> list[str]:
+    if not spec:
+        raise OrganizeMediaError("season range is empty")
+    if SINGLE_SEASON.fullmatch(spec):
+        return [pad_season(int(spec))]
+    if not SEASON_COUNT.fullmatch(spec):
+        raise OrganizeMediaError(
+            f"invalid season format '{spec}', use a single number or a range like '1' or '0-3'"
+        )
+    start_text, end_text = spec.split("-")
+    start = int(start_text)
+    end = int(end_text)
+    if start > end:
+        raise OrganizeMediaError(f"invalid season range '{spec}', start must be <= end")
+    return [pad_season(number) for number in range(start, end + 1)]
+
+
+def parse_tvdb_ids(id_string: str, content_type: str, seasons: list[str]) -> tuple[str, list[str]]:
+    ids = [part for part in id_string.split(",") if part]
+    if not ids:
+        raise OrganizeMediaError("tvdb id is empty")
+    if content_type == MOVIE:
+        if len(ids) != 1:
+            raise OrganizeMediaError(f"a movie takes one tvdb id, got {len(ids)}")
+        return ids[0], []
+    if len(ids) > 1 and len(ids) - 1 != len(seasons):
+        raise OrganizeMediaError(
+            f"{len(ids) - 1} season ids given but {len(seasons)} seasons requested, "
+            "the counts must match"
+        )
+    return ids[0], ids[1:]
+
+
+def season_id_for(index: int, season_ids: list[str], show_id: str) -> str:
+    if index < len(season_ids):
+        return season_ids[index]
+    return show_id
+
+
+def main_directory_for(root: Path, title: str, year: str, tvdb_id: str) -> Path:
+    return root / f"{title} ({year}) [tvdbid-{tvdb_id}]"
+
+
+def season_directory_for(main_directory: Path, season: str, tvdb_id: str) -> Path:
+    return main_directory / f"Season {season} [tvdbid-{tvdb_id}]"
+
+
+def build_show_plan(
+    root: Path,
+    content_type: str,
+    title: str,
+    year: str,
+    id_string: str,
+    season_spec: str,
+) -> ShowPlan:
+    if content_type not in CONTENT_TYPES:
+        raise OrganizeMediaError(f"type must be one of {', '.join(CONTENT_TYPES)}")
+    if not title:
+        raise OrganizeMediaError("name is required")
+    if not year:
+        raise OrganizeMediaError("year is required")
+
+    if content_type == SHOW and not season_spec:
+        raise OrganizeMediaError("seasons are required for a tv show")
+
+    seasons = parse_season_range(season_spec) if content_type == SHOW else []
+    show_id, season_ids = parse_tvdb_ids(id_string, content_type, seasons)
+    main_directory = main_directory_for(root, title, year, show_id)
+
+    season_plans = tuple(
+        SeasonPlan(
+            number=season,
+            directory=season_directory_for(
+                main_directory, season, season_id_for(index, season_ids, show_id)
+            ),
+        )
+        for index, season in enumerate(seasons)
+    )
+    return ShowPlan(content_type, title, year, show_id, season_plans, main_directory)
+
+
+def find_show_directory(root: Path, title: str) -> tuple[Path, str, str]:
+    for candidate in sorted(root.iterdir()):
+        if not candidate.is_dir():
+            continue
+        match = MAIN_FOLDER.match(candidate.name)
+        if match and match.group("name") == title:
+            return candidate, match.group("year"), match.group("id")
+    raise OrganizeMediaError(f"no existing folder for '{title}' in {root}")
+
+
+def build_add_season_plan(root: Path, title: str, season: str, season_id: str) -> ShowPlan:
+    main_directory, year, show_id = find_show_directory(root, title)
+    number = pad_season(int(season))
+    chosen_id = season_id or show_id
+    season_plan = SeasonPlan(number, season_directory_for(main_directory, number, chosen_id))
+    return ShowPlan(SHOW, title, year, show_id, (season_plan,), main_directory)
+
+
+def create_directories(plan: ShowPlan, dry_run: bool) -> None:
+    for directory in plan.directories():
+        shown = escape(str(directory))
+        if directory.is_dir():
+            console.print(f"[{EXISTS}]· exists[/] {shown}")
+            continue
+        if dry_run:
+            console.print(f"[{QUESTION}]+ would create[/] {shown}")
+            continue
+        directory.mkdir(parents=True)
+        console.print(f"[{CREATED}]+ created[/] {shown}")
+
+
+def ask(prompt: str, default: str = "") -> str:
+    if default:
+        return Prompt.ask(f"[{QUESTION}]{prompt}[/]", default=default, console=console).strip()
+    while True:
+        answer = Prompt.ask(f"[{QUESTION}]{prompt}[/]", console=console).strip()
+        if answer:
+            return answer
+        console.print("[red]an answer is required[/]")
+
+
+def asks_yes(question: str) -> bool:
+    return Confirm.ask(f"[{QUESTION}]{question}[/]", default=False, console=console)
+
+
+TYPE_MENU = (("1", MOVIE), ("2", SHOW))
+
+
+def ask_type() -> str:
+    menu = "  ".join(f"[bold][{number}][/] {name}" for number, name in TYPE_MENU)
+    accepted = {}
+    for number, name in TYPE_MENU:
+        accepted[number] = name
+        accepted[name] = name
+        accepted[name[0]] = name
+    while True:
+        answer = ask(f"type  {menu}", MOVIE).lower()
+        if answer in accepted:
+            return accepted[answer]
+        console.print(f"[red]pick {MOVIE} or {SHOW}[/]")
+
+
+def show_plan(plan: ShowPlan) -> None:
+    tree = Tree(f"[bold]{escape(plan.main_directory.name)}[/]")
+    for season in plan.seasons:
+        style = EXISTS if season.directory.is_dir() else PLAIN
+        marker = "·" if season.directory.is_dir() else "+"
+        tree.add(f"[{style}]{marker} {escape(season.directory.name)}[/]")
+    console.print(Panel(tree, title="plan", border_style="cyan", padding=(0, 1)))
+
+
+def ask_season_ids(seasons: list[str]) -> list[str]:
+    return [ask(f"tvdb id for season {season}") for season in seasons]
+
+
+def id_string_for(show_id: str, season_ids: list[str]) -> str:
+    given = [season_id for season_id in season_ids if season_id]
+    return ",".join([show_id, *given])
+
+
+def run_guided(root: Path) -> int:
+    content_type = ask_type()
+    if content_type not in CONTENT_TYPES:
+        raise OrganizeMediaError(f"type must be one of {', '.join(CONTENT_TYPES)}")
+    title = ask("title")
+    year = ask("year")
+    show_id = ask("tvdb id for the title")
+
+    if content_type == MOVIE:
+        plan = build_show_plan(root, MOVIE, title, year, show_id, "")
+        show_plan(plan)
+        if not asks_yes("create this folder?"):
+            console.print("[yellow]cancelled[/]")
+            return 1
+        create_directories(plan, dry_run=False)
+        return 0
+
+    season_spec = ask("seasons, number or range like 1-3")
+    season_ids = ask_season_ids(parse_season_range(season_spec))
+
+    while True:
+        plan = build_show_plan(root, SHOW, title, year, id_string_for(show_id, season_ids), season_spec)
+        show_plan(plan)
+        if not asks_yes("create these folders?"):
+            console.print("[yellow]cancelled[/]")
+            return 1
+        create_directories(plan, dry_run=False)
+        if not ask("add another season?", "n").lower().startswith("y"):
+            return 0
+        season_spec = ask("season number to add")
+        season_ids = ask_season_ids(parse_season_range(season_spec))
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="organize_media",
+        description="create tvdb tagged folders for movies and tv shows",
+        epilog="run with no arguments and it asks for each value, one question at a time",
+    )
+    parser.add_argument("-t", "--type", choices=CONTENT_TYPES, help="movie or show, skips the questions")
+    parser.add_argument("-n", "--name", help="title of the movie or show")
+    parser.add_argument("-y", "--year", help="release year")
+    parser.add_argument("-i", "--id", help="tvdb id, comma separated for season ids")
+    parser.add_argument("-s", "--seasons", help="season number or range, shows only")
+    parser.add_argument("--add-season", nargs=2, metavar=("NAME", "SEASON"), help="add a season to an existing show")
+    parser.add_argument("--season-id", help="tvdb id for the season added with --add-season")
+    parser.add_argument("-d", "--dry-run", action="store_true", help="show what would be created")
+    parser.add_argument("--root", type=Path, default=Path("."), help="directory to create folders in")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        return run(argv)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]cancelled[/]")
+        return 130
+    except EOFError:
+        console.print("\n[yellow]cancelled[/]")
+        return 1
+
+
+def run(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    root = args.root
+
+    if not root.is_dir():
+        console.print(f"[red]error:[/] {escape(str(root))} is not a directory")
+        return 1
+
+    if args.add_season:
+        title, season = args.add_season
+        try:
+            plan = build_add_season_plan(root, title, season, args.season_id or "")
+        except OrganizeMediaError as error:
+            console.print(f"[red]error:[/] {escape(str(error))}")
+            return 1
+        show_plan(plan)
+        if not args.dry_run and not asks_yes("create this season folder?"):
+            console.print("[yellow]cancelled[/]")
+            return 1
+        create_directories(plan, args.dry_run)
+        return 0
+
+    given = (args.type, args.name, args.year, args.id, args.seasons)
+    if all(value is None for value in given):
+        try:
+            return run_guided(root)
+        except OrganizeMediaError as error:
+            console.print(f"[red]error:[/] {escape(str(error))}")
+            return 1
+
+    try:
+        plan = build_show_plan(
+            root,
+            args.type or "",
+            args.name or "",
+            args.year or "",
+            args.id or "",
+            args.seasons or "",
+        )
+    except OrganizeMediaError as error:
+        console.print(f"[red]error:[/] {escape(str(error))}")
+        return 1
+
+    show_plan(plan)
+    if not args.dry_run and not asks_yes("create these folders?"):
+        console.print("[yellow]cancelled[/]")
+        return 1
+    create_directories(plan, args.dry_run)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
