@@ -1,3 +1,4 @@
+import io
 import json
 import pathlib
 
@@ -279,16 +280,34 @@ def test_strip_command_never_emits_both_a_list_and_a_no_flag():
     assert "--no-subtitles" not in command
 
 
+def fake_process(returncode=0, stdout="", stderr=""):
+    class Proc:
+        def __init__(self):
+            self.stdout = iter([stdout])
+            self.stderr = io.StringIO(stderr)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def wait(self):
+            return returncode
+
+    return Proc()
+
+
 def test_strip_one_replaces_the_original(tmp_path, monkeypatch):
     source = tmp_path / "a.mkv"
     source.write_text("original")
 
-    def fake_run(command, **kwargs):
+    def fake_popen(command, **kwargs):
         temp = [part for part in command if part.endswith(".stripping.mkv")][0]
         (tmp_path / "a.stripping.mkv").write_text("stripped")
-        return type("F", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        return fake_process(0)
 
-    monkeypatch.setattr(mkv.subprocess, "run", fake_run)
+    monkeypatch.setattr(mkv.subprocess, "Popen", fake_popen)
 
     ok, detail = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge")
 
@@ -301,12 +320,12 @@ def test_strip_one_keeps_the_original_on_failure(tmp_path, monkeypatch):
     source = tmp_path / "a.mkv"
     source.write_text("original")
 
-    def fake_run(command, **kwargs):
+    def fake_popen(command, **kwargs):
         temp = [part for part in command if part.endswith(".stripping.mkv")][0]
         (tmp_path / "a.stripping.mkv").write_text("half")
-        return type("F", (), {"returncode": 2, "stdout": "", "stderr": "boom\n"})()
+        return fake_process(2, stderr="boom\n")
 
-    monkeypatch.setattr(mkv.subprocess, "run", fake_run)
+    monkeypatch.setattr(mkv.subprocess, "Popen", fake_popen)
 
     ok, detail = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge")
 
@@ -320,11 +339,7 @@ def test_strip_one_reports_missing_output(tmp_path, monkeypatch):
     source = tmp_path / "a.mkv"
     source.write_text("original")
 
-    monkeypatch.setattr(
-        mkv.subprocess,
-        "run",
-        lambda command, **kwargs: type("F", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
-    )
+    monkeypatch.setattr(mkv.subprocess, "Popen", lambda command, **kwargs: fake_process(0))
 
     ok, detail = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge")
 
@@ -448,7 +463,7 @@ def test_main_strips_when_confirmed(tmp_path, monkeypatch, capsys):
     )
     calls = []
 
-    def fake_strip(plan, mkvmerge):
+    def fake_strip(plan, mkvmerge, report=None):
         calls.append(plan.path)
         source.write_text("stripped")
         return True, ""
@@ -530,3 +545,49 @@ def test_main_handles_ctrl_c(monkeypatch, capsys):
 
     assert code == 130
     assert "cancelled" in capsys.readouterr().out
+
+def test_read_progress_parses_carriage_returns(monkeypatch):
+    seen = []
+    stream = iter(["Progress: 0%\rProgress: 40%\rProgress: 100%\r\n"])
+
+    mkv.read_progress(stream, seen.append)
+
+    assert seen == [0, 40, 100]
+
+
+def test_read_progress_ignores_other_output():
+    seen = []
+    stream = iter(["mkvmerge v102.0\nThe file has been opened for writing.\n"])
+
+    mkv.read_progress(stream, seen.append)
+
+    assert seen == []
+
+
+def test_strip_one_reports_progress(tmp_path, monkeypatch):
+    source = tmp_path / "a.mkv"
+    source.write_text("x")
+    seen = []
+
+    def fake_popen(command, **kwargs):
+        (tmp_path / "a.stripping.mkv").write_text("y")
+        return fake_process(0, stdout="Progress: 12%\rProgress: 88%\r")
+
+    monkeypatch.setattr(mkv.subprocess, "Popen", fake_popen)
+
+    ok, _ = mkv.strip_one(mkv.FilePlan(source, (), ()), "mkvmerge", seen.append)
+
+    assert ok
+    assert seen == [12, 88]
+
+
+def test_line_buffered_prefixes_stdbuf(monkeypatch):
+    monkeypatch.setattr(mkv.shutil, "which", lambda name: "/usr/bin/stdbuf")
+
+    assert mkv.line_buffered(["mkvmerge", "-o", "x"])[0] == "stdbuf"
+
+
+def test_line_buffered_without_stdbuf(monkeypatch):
+    monkeypatch.setattr(mkv.shutil, "which", lambda name: None)
+
+    assert mkv.line_buffered(["mkvmerge"]) == ["mkvmerge"]

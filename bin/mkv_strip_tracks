@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Strip audio and subtitle tracks from MKV files, matching tracks by identity rather than position."""
+"""Strip audio and subtitle tracks from MKV files."""
 
 import argparse
+import re
 import json
 import os
 import shutil
@@ -26,6 +27,7 @@ DIM = "dim"
 
 MKV_SUFFIX = ".mkv"
 TEMP_SUFFIX = ".stripping"
+PROGRESS_LINE = re.compile(r"Progress:\s*(\d+)%")
 AUDIO = "audio"
 SUBTITLES = "subtitles"
 SELECTABLE_TYPES = (AUDIO, SUBTITLES)
@@ -260,6 +262,12 @@ def build_plan(scans: list[FileScan], selections: list[Selection], ask: bool) ->
     return plans
 
 
+def line_buffered(command: list[str]) -> list[str]:
+    if shutil.which("stdbuf"):
+        return ["stdbuf", "-oL", *command]
+    return command
+
+
 def strip_command(plan: FilePlan, mkvmerge: str) -> list[str]:
     temp = plan.path.with_name(plan.path.stem + TEMP_SUFFIX + MKV_SUFFIX)
     command = [mkvmerge, "-o", str(temp)]
@@ -271,16 +279,35 @@ def strip_command(plan: FilePlan, mkvmerge: str) -> list[str]:
     return command
 
 
-def strip_one(plan: FilePlan, mkvmerge: str) -> tuple[bool, str]:
+def read_progress(stream, report) -> None:
+    for line in stream:
+        for chunk in line.replace("\r", "\n").split("\n"):
+            match = PROGRESS_LINE.search(chunk)
+            if match:
+                report(int(match.group(1)))
+
+
+def strip_one(plan: FilePlan, mkvmerge: str, report=None) -> tuple[bool, str]:
     temp = plan.path.with_name(plan.path.stem + TEMP_SUFFIX + MKV_SUFFIX)
+    command = line_buffered(strip_command(plan, mkvmerge))
     try:
-        finished = subprocess.run(strip_command(plan, mkvmerge), capture_output=True, text=True, check=False)
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
     except OSError as error:
         return False, str(error)
-    if finished.returncode != 0:
+    with process:
+        read_progress(process.stdout, report or (lambda percent: None))
+        errors = process.stderr.read()
+        code = process.wait()
+    if code != 0:
         temp.unlink(missing_ok=True)
-        detail = finished.stderr.strip().splitlines()
-        return False, detail[0] if detail else f"mkvmerge exited {finished.returncode}"
+        detail = errors.strip().splitlines()
+        return False, detail[0] if detail else f"mkvmerge exited {code}"
     if not temp.is_file():
         return False, "mkvmerge produced no output file"
     os.replace(temp, plan.path)
@@ -305,24 +332,30 @@ def format_size(value: int) -> str:
     return f"{value} B"
 
 
+def describe_missing(plan: FilePlan) -> str:
+    parts = [f"{s.kind[:3]} {s.language}" for s in plan.missing]
+    return ", ".join(parts)
+
+
 def build_plan_table(plans: list[FilePlan], processed: set[Path]) -> Table:
     table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
-    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="ellipsis", ratio=1, min_width=24)
     table.add_column(justify="right", width=8)
-    table.add_column(justify="right", width=8)
-    table.add_column(overflow="ellipsis")
+    table.add_column(justify="right", width=11)
+    table.add_column(overflow="fold")
     for plan in plans:
-        if plan.path in processed:
-            audio = len(plan.ids_for(AUDIO))
-            subs = len(plan.ids_for(SUBTITLES))
-            note = f"[{DIM}]clean[/]"
-        else:
-            audio = subs = 0
+        audio = len(plan.ids_for(AUDIO))
+        subs = len(plan.ids_for(SUBTITLES))
+        if plan.path not in processed:
             note = f"[{DROP}]skipped, {len(plan.missing)} missing[/]"
+        elif plan.missing:
+            note = f"[{DIM}]{len(plan.missing)} missing:[/] [dim]{escape(describe_missing(plan))}[/]"
+        else:
+            note = f"[{DIM}]clean[/]"
         table.add_row(
             escape(plan.path.name),
-            f"[{KEEP}]{audio}[/]",
-            f"[{KEEP}]{subs}[/]",
+            f"[{KEEP}]{audio} audio[/]",
+            f"[{KEEP}]{subs} subtitles[/]",
             note,
         )
     return table
@@ -358,20 +391,22 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
     failures = 0
     with Progress(
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
+        BarColumn(complete_style=KEEP, style=DIM, finished_style=KEEP),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
         console=console,
         transient=True,
     ) as progress:
-        task = progress.add_task("stripping", total=len(plans))
-        for plan in plans:
-            progress.update(task, description=escape(plan.path.name))
-            ok, detail = strip_one(plan, mkvmerge)
+        overall = progress.add_task("stripping", total=len(plans))
+        for index, plan in enumerate(plans, start=1):
+            progress.update(overall, description=f"{index}/{len(plans)}")
+            task = progress.add_task(escape(plan.path.name), total=100)
+            ok, detail = strip_one(plan, mkvmerge, lambda percent: progress.update(task, completed=percent))
+            progress.remove_task(task)
             if not ok:
                 failures += 1
                 console.print(f"[{FAIL}]x[/] {escape(plan.path.name)}: {escape(detail)}")
-            progress.advance(task)
+            progress.advance(overall)
     return failures
 
 
