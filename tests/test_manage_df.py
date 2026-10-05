@@ -36,21 +36,28 @@ def test_package_targets_match_the_fish_version(name, expected):
 
 
 def test_stow_command_shape():
-    command = manage_df.stow_command(ACTIONS["restow"], pathlib.Path("/t"), "bin", False)
+    command = manage_df.stow_command(ACTIONS["restow"], pathlib.Path("/r"), pathlib.Path("/t"), "bin", False)
 
-    assert command == ["stow", "--no-folding", "-R", "-t", "/t", "bin"]
+    assert command == ["stow", "--no-folding", "-R", "--dir", "/r", "-t", "/t", "bin"]
 
 
 def test_stow_command_without_a_flag():
-    command = manage_df.stow_command(ACTIONS["stow"], pathlib.Path("/t"), "config", False)
+    command = manage_df.stow_command(ACTIONS["stow"], pathlib.Path("/r"), pathlib.Path("/t"), "config", False)
 
-    assert command == ["stow", "--no-folding", "-t", "/t", "config"]
+    assert command == ["stow", "--no-folding", "--dir", "/r", "-t", "/t", "config"]
 
 
 def test_stow_command_with_verbose():
-    command = manage_df.stow_command(ACTIONS["stow"], pathlib.Path("/t"), "config", True)
+    command = manage_df.stow_command(ACTIONS["stow"], pathlib.Path("/r"), pathlib.Path("/t"), "config", True)
 
     assert "-v" in command
+
+
+def test_stow_command_names_the_source_so_cwd_does_not_matter():
+    command = manage_df.stow_command(ACTIONS["stow"], pathlib.Path("/repo"), pathlib.Path("/t"), "bin", False)
+
+    assert "--dir" in command
+    assert command[command.index("--dir") + 1] == "/repo"
 
 
 @pytest.mark.parametrize(
@@ -121,7 +128,7 @@ def test_run_package_reports_a_missing_source(tmp_path, monkeypatch):
     monkeypatch.setattr(manage_df, "PACKAGES", {"config": tmp_path / "config"})
     monkeypatch.setenv("DOTFILES_PATH", str(tmp_path / "empty-repo"))
 
-    result = manage_df.run_package("config", ACTIONS["stow"], False)
+    result = manage_df.run_package(tmp_path / "empty-repo", "config", ACTIONS["stow"], False)
 
     assert result.outcome == "missing"
     assert not (tmp_path / "config").exists()
@@ -140,7 +147,7 @@ def test_run_package_marks_a_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(manage_df.subprocess, "run", lambda command, **kwargs: Finished())
 
-    result = manage_df.run_package("config", ACTIONS["stow"], False)
+    result = manage_df.run_package(repo, "config", ACTIONS["stow"], False)
 
     assert result.outcome == "failed"
     assert "cannot stow" in result.detail
@@ -159,7 +166,7 @@ def test_run_package_succeeds(tmp_path, monkeypatch):
 
     monkeypatch.setattr(manage_df.subprocess, "run", lambda command, **kwargs: Finished())
 
-    result = manage_df.run_package("bin", ACTIONS["stow"], False)
+    result = manage_df.run_package(repo, "bin", ACTIONS["stow"], False)
 
     assert result.outcome == "done"
     assert (tmp_path / "target" / "bin").is_dir()
@@ -184,7 +191,7 @@ def test_main_reports_a_missing_stow(monkeypatch, capsys):
 def test_main_runs_only_the_requested_packages(monkeypatch, capsys):
     seen = []
     monkeypatch.setattr(manage_df.shutil, "which", lambda name: "/usr/bin/stow")
-    monkeypatch.setattr(manage_df, "run_package", lambda p, a, v: seen.append(p) or manage_df.Result(p, pathlib.Path("/t"), "done"))
+    monkeypatch.setattr(manage_df, "run_package", lambda s, p, a, v: seen.append(p) or manage_df.Result(p, pathlib.Path("/t"), "done"))
 
     code = manage_df.main(["-p", "bin"])
 
@@ -197,7 +204,7 @@ def test_main_returns_one_on_failure(monkeypatch, capsys):
     monkeypatch.setattr(
         manage_df,
         "run_package",
-        lambda p, a, v: manage_df.Result(p, pathlib.Path("/t"), "failed", "boom"),
+        lambda s, p, a, v: manage_df.Result(p, pathlib.Path("/t"), "failed", "boom"),
     )
 
     code = manage_df.main(["-p", "bin"])
@@ -224,3 +231,39 @@ def test_report_shows_detail_when_verbose(capsys):
     out = capsys.readouterr().out
     assert "LINK: thing" in out
     assert "stow output" in out
+
+def test_main_works_from_any_directory(tmp_path, monkeypatch):
+    source = tmp_path / "repo"
+    for name in ("home", "config", "bin", "agents"):
+        (source / name).mkdir(parents=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.setattr(manage_df.shutil, "which", lambda name: "/usr/bin/stow")
+    monkeypatch.chdir(elsewhere)
+    seen = {}
+
+    def fake_run_package(src, package, action, verbose):
+        seen["source"] = src
+        return manage_df.Result(package, pathlib.Path("/t"), "done")
+
+    monkeypatch.setattr(manage_df, "run_package", fake_run_package)
+
+    code = manage_df.main(["--dotfiles", str(source)])
+
+    assert code == 0
+    assert seen["source"] == source
+
+
+def test_main_rejects_a_bad_source(tmp_path, capsys):
+    code = manage_df.main(["--dotfiles", str(tmp_path / "nope")])
+
+    assert code == 1
+    assert "not a directory" in capsys.readouterr().out
+
+
+def test_source_defaults_to_the_script_parent(monkeypatch):
+    monkeypatch.delenv("DOTFILES_PATH", raising=False)
+
+    parsed = manage_df.build_parser().parse_args([])
+
+    assert parsed.dotfiles == pathlib.Path(manage_df.__file__).resolve().parents[1]

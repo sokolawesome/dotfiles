@@ -57,13 +57,13 @@ class Result:
     detail: str = ""
 
 
-def stow_command(action: Action, target: Path, package: str, verbose: bool) -> list[str]:
+def stow_command(action: Action, source: Path, target: Path, package: str, verbose: bool) -> list[str]:
     command = ["stow", *STOW_FLAGS]
     if action.flag:
         command.append(action.flag)
     if verbose:
         command.append("-v")
-    command += ["-t", str(target), package]
+    command += ["--dir", str(source), "-t", str(target), package]
     return command
 
 
@@ -88,14 +88,13 @@ def selected_packages(requested: list[str]) -> list[str]:
     return [name for name in PACKAGE_ORDER if name in requested]
 
 
-def run_package(package: str, action: Action, verbose: bool) -> Result:
+def run_package(source: Path, package: str, action: Action, verbose: bool) -> Result:
     target = PACKAGES[package]
-    source_exists = (Path(os.environ.get("DOTFILES_PATH", ".")) / package).is_dir()
-    if not source_exists:
+    if not (source / package).is_dir():
         return Result(package, target, "missing")
 
     ensure_target(target)
-    command = stow_command(action, target, package, verbose)
+    command = stow_command(action, source, target, package, verbose)
     finished = subprocess.run(command, capture_output=True, text=True, check=False)
     if finished.returncode != 0:
         return Result(package, target, "failed", finished.stderr.strip() or finished.stdout.strip())
@@ -157,7 +156,12 @@ def main(argv: list[str] | None = None) -> int:
         console.print(f"[red]error:[/] {escape(str(error))}")
         return 1
 
-    results = [run_package(package, action, args.verbose) for package in packages]
+    source = args.dotfiles
+    if not source.is_dir():
+        console.print(f"[red]error:[/] not a directory: {escape(str(source))}")
+        return 1
+
+    results = [run_package(source, package, action, args.verbose) for package in packages]
     return report(action, results, args.verbose)
 
 
@@ -174,6 +178,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.set_defaults(action="stow")
     parser.add_argument("-p", "--package", action="append", metavar="NAME", help="limit to one package, repeatable")
     parser.add_argument("-v", "--verbose", action="store_true", help="show stow's own output")
+    parser.add_argument(
+        "--dotfiles",
+        type=Path,
+        default=Path(os.environ.get("DOTFILES_PATH", Path(__file__).resolve().parents[1])),
+        help="dotfiles repo root, defaults to DOTFILES_PATH or the parent of this script",
+    )
     return parser
 
 
