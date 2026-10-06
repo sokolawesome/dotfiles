@@ -1,3 +1,4 @@
+import io
 import pytest
 from conftest import load_module
 
@@ -71,9 +72,9 @@ def test_archive_suffix(name, expected):
         ("ch12.cbz", ("c", "012")),
         ("c0.cbz", ("c", "000")),
         ("c999.cbz", ("c", "999")),
-        ("003.cbz", ("c", "003")),
-        ("45.cbz", ("c", "045")),
-        ("108.cbz", ("c", "108")),
+        ("003.cbz", ("v", "03")),
+        ("45.cbz", ("v", "45")),
+        ("108.cbz", ("v", "108")),
         ("Ch.1080p.cbz", ("c", "1080")),
         ("vol.1-2.cbz", ("v", "01")),
         ("Vol 3 Extra.cbz", ("v", "03")),
@@ -105,8 +106,10 @@ def test_parse_kind_and_number_prefers_volume_over_chapter():
     assert rename_manga.parse_kind_and_number("Vol 3 Chapter 12.cbz") == ("v", "03")
 
 
-def test_parse_kind_and_number_single_digit_bare_number():
-    assert rename_manga.parse_kind_and_number("7.cbz") == ("c", "007")
+def test_parse_kind_and_number_bare_number_is_a_volume():
+    assert rename_manga.parse_kind_and_number("7.cbz") == ("v", "07")
+    assert rename_manga.parse_kind_and_number("14.cbz") == ("v", "14")
+    assert rename_manga.parse_kind_and_number("01.cbz") == ("v", "01")
 
 
 @pytest.mark.parametrize(
@@ -230,14 +233,110 @@ def test_apply_renames_moves_files_and_counts_failures(tmp_path, capsys):
     assert not (tmp_path / "v01.cbz").exists()
 
 
-def test_write_undo_log_records_both_names(tmp_path):
-    entry = rename_manga.MangaFile(tmp_path / "v01.cbz", "v", "01", "01.cbz")
-    log = tmp_path / ".rename_manga.log"
+def test_already_named_files_are_left_alone():
+    for name, target in [("01.cbz", "01.cbz"), ("c001.cbz", "c001.cbz"), ("14.cbz", "14.cbz")]:
+        assert rename_manga.target_name(*rename_manga.parse_kind_and_number(name), rename_manga.archive_suffix(name)) == target
 
-    rename_manga.write_undo_log([entry], log)
-    rename_manga.write_undo_log([entry], log)
 
-    lines = log.read_text().splitlines()
-    assert lines.count("v01.cbz\t01.cbz") == 2
-    assert lines[0].startswith("# ")
-    assert lines[2].startswith("# ")
+def test_settled_marks_unchanged_files(tmp_path):
+    settled = rename_manga.MangaFile(tmp_path / "01.cbz", "v", "01", "01.cbz")
+    moved = rename_manga.MangaFile(tmp_path / "v01.cbz", "v", "01", "01.cbz")
+
+    assert settled.settled
+    assert not moved.settled
+
+
+def test_volumes_sort_before_chapters(tmp_path):
+    files = [
+        rename_manga.MangaFile(tmp_path / "c001.cbz", "c", "001", "c001.cbz"),
+        rename_manga.MangaFile(tmp_path / "v02.cbz", "v", "02", "02.cbz"),
+        rename_manga.MangaFile(tmp_path / "c002.cbz", "c", "002", "c002.cbz"),
+        rename_manga.MangaFile(tmp_path / "v01.cbz", "v", "01", "01.cbz"),
+    ]
+
+    ordered = sorted(files, key=lambda f: f.rank)
+
+    assert [f.source.name for f in ordered] == ["v01.cbz", "v02.cbz", "c001.cbz", "c002.cbz"]
+
+
+def test_classify_sorts_volumes_first(tmp_path):
+    for name in ("c002.cbz", "v02.cbz", "c001.cbz", "v01.cbz"):
+        (tmp_path / name).write_text("x")
+
+    entries, _ = rename_manga.classify(rename_manga.scan_manga_files(tmp_path))
+
+    assert [e.kind for e in entries] == ["v", "v", "c", "c"]
+    assert [e.number for e in entries] == ["01", "02", "001", "002"]
+
+
+def test_apply_renames_skips_settled_files(tmp_path):
+    (tmp_path / "01.cbz").write_text("x")
+    settled = rename_manga.MangaFile(tmp_path / "01.cbz", "v", "01", "01.cbz")
+
+    failures = rename_manga.apply_renames([settled])
+
+    assert failures == 0
+    assert (tmp_path / "01.cbz").read_text() == "x"
+
+
+def test_plural_switches_on_count():
+    assert rename_manga.plural(1, "file") == "1 file"
+    assert rename_manga.plural(0, "file") == "0 files"
+    assert rename_manga.plural(4, "file") == "4 files"
+
+
+def test_main_exits_early_when_everything_is_named(tmp_path, capsys):
+    for name in ("01.cbz", "02.cbz", "c001.cbz"):
+        (tmp_path / name).write_text("x")
+
+    code = rename_manga.main(["--directory", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "nothing to rename" in out
+    assert "3 files already named" in out
+    assert "proceed?" not in out
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["01.cbz", "02.cbz", "c001.cbz"]
+
+
+def test_main_early_exit_uses_singular_for_one_file(tmp_path, capsys):
+    (tmp_path / "01.cbz").write_text("x")
+
+    rename_manga.main(["--directory", str(tmp_path)])
+
+    assert "1 file already named" in capsys.readouterr().out
+
+
+def test_main_renames_only_the_pending_files(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO("y\n"))
+    (tmp_path / "01.cbz").write_text("x")
+    (tmp_path / "One-Punch Man 208 (2025).cbz").write_text("x")
+
+    code = rename_manga.main(["--directory", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "done - 1 file renamed" in out
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["01.cbz", "c208.cbz"]
+
+
+def test_main_dry_run_reports_nothing_to_rename(tmp_path, capsys):
+    (tmp_path / "c001.cbz").write_text("x")
+
+    code = rename_manga.main(["--dry-run", "--directory", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "nothing to rename" in out
+
+
+def test_main_treats_missing_stdin_as_cancelled(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    (tmp_path / "One Punch Man 208.cbz").write_text("x")
+
+    code = rename_manga.main(["--directory", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert code == 130
+    assert "cancelled" in out
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["One Punch Man 208.cbz"]

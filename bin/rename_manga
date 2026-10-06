@@ -4,10 +4,9 @@
 import argparse
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
-from rich.console import Console, Group
+from rich.console import Console
 from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -19,15 +18,19 @@ QUESTION = "bold cyan"
 RENAMED = "bold green"
 SKIPPED = "yellow"
 FAILED = "red"
+DIM = "dim"
 
 VOLUME = "v"
 CHAPTER = "c"
+KIND_ORDER = {VOLUME: 0, CHAPTER: 1}
 
 VOLUME_WIDTH = 2
 CHAPTER_WIDTH = 3
 
 ARCHIVE_SUFFIXES = (".cbz", ".cbr")
-UNDO_LOG_NAME = ".rename_manga.log"
+
+ALREADY_VOLUME = re.compile(r"^(\d{1,3})$")
+ALREADY_CHAPTER = re.compile(r"^c(\d{1,3})$", re.IGNORECASE)
 
 LADDER = (
     (VOLUME, VOLUME_WIDTH, re.compile(r"\bv(?:ol(?:ume)?)?\.?\s*([0-9]+)", re.IGNORECASE)),
@@ -43,12 +46,24 @@ class MangaFile:
     number: str
     target: str
 
+    @property
+    def settled(self) -> bool:
+        return self.target == self.source.name
+
+    @property
+    def rank(self) -> tuple[int, int, str]:
+        return (KIND_ORDER[self.kind], int(self.number), self.source.name)
+
     def rename(self) -> Path:
         return self.source.with_name(self.target)
 
 
 def strip_archive_suffix(name: str) -> str:
     return re.sub(r"\.[^.]+$", "", name)
+
+
+def plural(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
 
 
 def pad(digits: str, width: int) -> str:
@@ -64,6 +79,15 @@ def archive_suffix(name: str) -> str | None:
 
 def parse_kind_and_number(name: str) -> tuple[str, str] | None:
     stem = strip_archive_suffix(name)
+
+    chapter = ALREADY_CHAPTER.match(stem)
+    if chapter:
+        return CHAPTER, pad(chapter.group(1), CHAPTER_WIDTH)
+
+    volume = ALREADY_VOLUME.match(stem)
+    if volume:
+        return VOLUME, pad(volume.group(1), VOLUME_WIDTH)
+
     for kind, width, pattern in LADDER:
         match = pattern.search(stem)
         if match:
@@ -93,6 +117,7 @@ def classify(paths: list[Path]) -> tuple[list[MangaFile], list[Path]]:
             continue
         kind, number = parsed
         matched.append(MangaFile(path, kind, number, target_name(kind, number, suffix)))
+    matched.sort(key=lambda entry: entry.rank)
     return matched, skipped
 
 
@@ -112,7 +137,10 @@ def build_preview(entries: list[MangaFile]) -> Table:
     table.add_column(justify="center", width=1)
     table.add_column(overflow="ellipsis")
     for entry in entries:
-        table.add_row(escape(entry.source.name), "→", f"[{RENAMED}]{escape(entry.target)}[/]")
+        if entry.settled:
+            table.add_row(escape(entry.source.name), "·", f"[{DIM}]unchanged[/]")
+        else:
+            table.add_row(escape(entry.source.name), "→", f"[{RENAMED}]{escape(entry.target)}[/]")
     return table
 
 
@@ -128,7 +156,10 @@ def show_preview(entries: list[MangaFile], skipped: list[Path]) -> None:
     console.print(Panel(build_preview(entries), title="preview", border_style="cyan", padding=(0, 1)))
     if skipped:
         console.print(Panel(build_skipped(skipped), title="skipped", border_style="yellow", padding=(0, 1)))
+    settled = sum(1 for entry in entries if entry.settled)
     summary = f"{len(entries)} files"
+    if settled:
+        summary += f", {settled} already named"
     if skipped:
         summary += f", {len(skipped)} skipped"
     console.print(f"[{QUESTION}]{summary}[/]\n")
@@ -138,17 +169,13 @@ def show_collisions(collisions: list[tuple[str, Path, Path]]) -> None:
     console.print("\n[red]error:[/] two files resolve to the same name")
     for target, first, second in collisions:
         console.print(f"  [red]{escape(target)}[/] from [dim]{escape(first.name)}[/] and [dim]{escape(second.name)}[/]")
-def write_undo_log(entries: list[MangaFile], path: Path) -> None:
-    stamp = datetime.now().isoformat(timespec="seconds")
-    with path.open("a") as log:
-        log.write(f"# {stamp}\n")
-        for entry in entries:
-            log.write(f"{entry.source.name}\t{entry.target}\n")
 
 
 def apply_renames(entries: list[MangaFile]) -> int:
     failures = 0
     for entry in entries:
+        if entry.settled:
+            continue
         try:
             entry.source.rename(entry.rename())
         except OSError as error:
@@ -172,16 +199,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def report(done: str, undo: Path | None = None) -> None:
+def report(done: str) -> None:
     console.print(f"\n[{RENAMED}]{done}[/]")
-    if undo is not None:
-        console.print(f"[{QUESTION}]undo log:[/] [dim]{escape(str(undo))}[/]")
 
 
 def main(argv: list[str] | None = None) -> int:
     try:
         return run(argv)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         console.print("\n[yellow]cancelled[/]")
         return 130
 
@@ -204,6 +229,11 @@ def run(argv: list[str] | None = None) -> int:
         console.print("[red]error:[/] could not extract numbers from any files")
         return 1
 
+    pending = [entry for entry in entries if not entry.settled]
+    if not pending:
+        console.print(f"[{RENAMED}]nothing to rename[/], {plural(len(entries), 'file')} already named")
+        return 0
+
     show_preview(entries, skipped)
 
     collisions = find_collisions(entries)
@@ -219,12 +249,10 @@ def run(argv: list[str] | None = None) -> int:
         console.print("[yellow]cancelled[/]")
         return 1
 
-    failures = apply_renames(entries)
+    failures = apply_renames(pending)
 
     if failures == 0:
-        undo = directory / UNDO_LOG_NAME
-        write_undo_log(entries, undo)
-        report(f"done - {len(entries)} files renamed", undo)
+        report(f"done - {plural(len(pending), 'file')} renamed")
     else:
         report(f"done with {failures} error(s)")
     return 0
