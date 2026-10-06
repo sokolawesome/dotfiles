@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from conftest import load_module
 
@@ -125,6 +127,12 @@ def test_match_number_rejects(name):
         ("Show.Name.1080p.S01E01.srt", ".srt"),
         ("Episode.05.srt", ".srt"),
         ("Show.S01E01.srt.mkv", ".mkv"),
+        ("S01E22.rus.anilibria.ass", ".rus.anilibria.ass"),
+        ("S01E23.rus.anilibria.ass", ".rus.anilibria.ass"),
+        ("S01E24.eng.subhd.ass", ".eng.subhd.ass"),
+        ("S01E01.RUS.AniLibria.ass", ".rus.AniLibria.ass"),
+        ("S01E01.rus.anilibria.srt", ".rus.anilibria.srt"),
+        ("S01E01.rus.1080p.ass", ".rus.ass"),
         ("notes.txt", ""),
         ("Show.S01E01", ""),
     ],
@@ -350,12 +358,136 @@ def test_apply_renames_moves_files_and_counts_failures(tmp_path, capsys):
     assert (tmp_path / "S01E05.mkv").exists()
 
 
-def test_write_undo_log_records_both_names(tmp_path):
-    entry = make_episode(tmp_path, "Show - 05.mkv", "01", "05", "S01E05.mkv")
-    log = tmp_path / ".rename_episodes.log"
+def test_plural_switches_on_count():
+    assert rename_episodes.plural(1, "file") == "1 file"
+    assert rename_episodes.plural(0, "file") == "0 files"
+    assert rename_episodes.plural(4, "file") == "4 files"
 
-    rename_episodes.write_undo_log([entry], log)
 
-    lines = log.read_text().splitlines()
-    assert lines[0].startswith("# ")
-    assert lines[1] == "Show - 05.mkv\tS01E05.mkv"
+def test_settled_marks_already_named_episodes(tmp_path):
+    settled = make_episode(tmp_path, "S01E01.mkv", "01", "1", "S01E01.mkv")
+    moved = make_episode(tmp_path, "Show - 1.mkv", "01", "1", "S01E01.mkv")
+
+    assert settled.settled
+    assert not moved.settled
+
+
+def test_main_exits_early_when_everything_is_named(tmp_path, capsys):
+    folder = build_folder(tmp_path)
+    (folder / "S01E01.mkv").write_text("x")
+    (folder / "S01E02.mkv").write_text("x")
+
+    code = rename_episodes.main(["--directory", str(folder)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "nothing to rename" in out
+    assert "2 files already named" in out
+    assert "proceed?" not in out
+    assert sorted(p.name for p in folder.iterdir()) == ["S01E01.mkv", "S01E02.mkv"]
+
+
+def test_main_early_exit_uses_singular_for_one_file(tmp_path, capsys):
+    folder = build_folder(tmp_path)
+    (folder / "S01E01.mkv").write_text("x")
+
+    rename_episodes.main(["--directory", str(folder)])
+
+    assert "1 file already named" in capsys.readouterr().out
+
+
+def test_main_renames_only_the_pending_episodes(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO("y\n"))
+    folder = build_folder(tmp_path)
+    (folder / "S01E01.mkv").write_text("x")
+    (folder / "Show - 07.mkv").write_text("x")
+
+    code = rename_episodes.main(["--directory", str(folder)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "done - 1 file renamed" in out
+    assert sorted(p.name for p in folder.iterdir()) == ["S01E01.mkv", "S01E07.mkv"]
+
+
+def test_main_dry_run_reports_nothing_to_rename(tmp_path, capsys):
+    folder = build_folder(tmp_path)
+    (folder / "S01E03.mkv").write_text("x")
+
+    code = rename_episodes.main(["--dry-run", "--directory", str(folder)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "nothing to rename" in out
+
+
+@pytest.mark.parametrize(
+    ("stem", "expected"),
+    [
+        ("S01E22.rus.anilibria", ".rus.anilibria"),
+        ("S01E22.rus", ".rus"),
+        ("S01E22.mkv", ""),
+        ("S01E22", ""),
+        ("S01E22.rus.anilibria.forced", ".rus.anilibria.forced"),
+        ("S01E22.1080p.rus", ".rus"),
+        ("Show.Name.1080p.S01E01", ""),
+        ("S01E22.netflix.eng", ".eng"),
+        ("S01E22.netflix.rus.anilibria", ".rus.anilibria"),
+        ("S01E22.rus.1080p", ".rus"),
+        ("S01E01.RUS.AniLibria", ".rus.AniLibria"),
+        ("S01E22.ru.anilibria", ".ru.anilibria"),
+        ("S01E22.en.subhd", ".en.subhd"),
+        ("S01E22.spa", ".spa"),
+        ("S01E22.jpn", ".jpn"),
+        ("S01E22.es", ".es"),
+        ("S01E22.ja", ".ja"),
+        ("S01E01.rus.720p.anilibria", ".rus"),
+        ("S01E01.Netflix.rus.anilibria", ".rus.anilibria"),
+        ("Show.S01E01.Netflix", ""),
+    ],
+)
+def test_trailing_tags(stem, expected):
+    assert rename_episodes.trailing_tags(stem) == expected
+
+
+def test_subtitle_language_and_group_survive_rename(tmp_path):
+    (tmp_path / "Show.S01E22.rus.anilibria.ass").write_text("x")
+    (tmp_path / "Show.S01E22.mkv").write_text("x")
+
+    episodes, _ = rename_episodes.classify(
+        sorted(tmp_path.iterdir()), "01", 0
+    )
+
+    assert sorted(e.target for e in episodes) == [
+        "S01E22.mkv",
+        "S01E22.rus.anilibria.ass",
+    ]
+
+
+def test_language_after_group_drops_the_group(tmp_path):
+    (tmp_path / "Show.S01E22.netflix.eng.ass").write_text("x")
+
+    episodes, _ = rename_episodes.classify([tmp_path / "Show.S01E22.netflix.eng.ass"], "01", 0)
+
+    assert episodes[0].target == "S01E22.eng.ass"
+
+
+def test_subtitle_with_tags_is_settled(tmp_path):
+    episode = rename_episodes.Episode(
+        tmp_path / "S01E22.rus.anilibria.ass", "01", "22", "S01E22.rus.anilibria.ass"
+    )
+
+    assert episode.settled
+
+
+def test_main_treats_missing_stdin_as_cancelled(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    folder = build_folder(tmp_path)
+    (folder / "Show - 05.mkv").write_text("x")
+
+    code = rename_episodes.main(["--directory", str(folder)])
+
+    out = capsys.readouterr().out
+    assert code == 130
+    assert "cancelled" in out
+    assert sorted(p.name for p in folder.iterdir()) == ["Show - 05.mkv"]
