@@ -5,6 +5,10 @@ from conftest import load_module
 rename_manga = load_module("rename_manga")
 
 
+def respond(monkeypatch, answer):
+    monkeypatch.setattr("sys.stdin", io.StringIO(f"{answer}\n"))
+
+
 @pytest.mark.parametrize(
     ("digits", "width", "expected"),
     [
@@ -167,15 +171,17 @@ def test_find_collisions_ignores_three_digit_ranges(tmp_path):
     assert rename_manga.find_collisions(entries) == []
 
 
-def test_main_dry_run_changes_nothing(tmp_path, capsys):
+def test_main_answering_no_changes_nothing(tmp_path, capsys, monkeypatch):
+    respond(monkeypatch, "n")
     (tmp_path / "v01.cbz").write_text("x")
     (tmp_path / "chapter 2.cbz").write_text("x")
     (tmp_path / "extra.cbz").write_text("x")
 
-    code = rename_manga.main(["--dry-run", "--directory", str(tmp_path)])
+    code = rename_manga.main(["--directory", str(tmp_path)])
 
     out = capsys.readouterr().out
-    assert code == 0
+    assert code == 1
+    assert "cancelled" in out
     assert "v01.cbz" in out and "01.cbz" in out
     assert "c002.cbz" in out
     assert "extra.cbz" in out
@@ -320,10 +326,10 @@ def test_main_renames_only_the_pending_files(tmp_path, capsys, monkeypatch):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["01.cbz", "c208.cbz"]
 
 
-def test_main_dry_run_reports_nothing_to_rename(tmp_path, capsys):
+def test_main_reports_nothing_to_rename(tmp_path, capsys):
     (tmp_path / "c001.cbz").write_text("x")
 
-    code = rename_manga.main(["--dry-run", "--directory", str(tmp_path)])
+    code = rename_manga.main(["--directory", str(tmp_path)])
 
     out = capsys.readouterr().out
     assert code == 0

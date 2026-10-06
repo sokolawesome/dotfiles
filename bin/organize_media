@@ -156,14 +156,11 @@ def build_add_season_plan(root: Path, title: str, season: str, season_id: str) -
     return ShowPlan(SHOW, title, year, show_id, (season_plan,), main_directory)
 
 
-def create_directories(plan: ShowPlan, dry_run: bool) -> None:
+def create_directories(plan: ShowPlan) -> None:
     for directory in plan.directories():
         shown = escape(str(directory))
         if directory.is_dir():
             console.print(f"[{EXISTS}]· exists[/] {shown}")
-            continue
-        if dry_run:
-            console.print(f"[{QUESTION}]+ would create[/] {shown}")
             continue
         directory.mkdir(parents=True)
         console.print(f"[{CREATED}]+ created[/] {shown}")
@@ -232,7 +229,7 @@ def run_guided(root: Path) -> int:
         if not asks_yes("create this folder?"):
             console.print("[yellow]cancelled[/]")
             return 1
-        create_directories(plan, dry_run=False)
+        create_directories(plan)
         return 0
 
     season_spec = ask("seasons, number or range like 1-3")
@@ -244,7 +241,7 @@ def run_guided(root: Path) -> int:
         if not asks_yes("create these folders?"):
             console.print("[yellow]cancelled[/]")
             return 1
-        create_directories(plan, dry_run=False)
+        create_directories(plan)
         if not ask("add another season?", "n").lower().startswith("y"):
             return 0
         season_spec = ask("season number to add")
@@ -264,7 +261,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-s", "--seasons", help="season number or range, shows only")
     parser.add_argument("--add-season", nargs=2, metavar=("NAME", "SEASON"), help="add a season to an existing show")
     parser.add_argument("--season-id", help="tvdb id for the season added with --add-season")
-    parser.add_argument("-d", "--dry-run", action="store_true", help="show what would be created")
     parser.add_argument("--root", type=Path, default=Path("."), help="directory to create folders in")
     return parser
 
@@ -296,10 +292,10 @@ def run(argv: list[str] | None = None) -> int:
             console.print(f"[red]error:[/] {escape(str(error))}")
             return 1
         show_plan(plan)
-        if not args.dry_run and not asks_yes("create this season folder?"):
+        if not asks_yes("create this season folder?"):
             console.print("[yellow]cancelled[/]")
             return 1
-        create_directories(plan, args.dry_run)
+        create_directories(plan)
         return 0
 
     given = (args.type, args.name, args.year, args.id, args.seasons)
@@ -324,10 +320,10 @@ def run(argv: list[str] | None = None) -> int:
         return 1
 
     show_plan(plan)
-    if not args.dry_run and not asks_yes("create these folders?"):
+    if not asks_yes("create these folders?"):
         console.print("[yellow]cancelled[/]")
         return 1
-    create_directories(plan, args.dry_run)
+    create_directories(plan)
     return 0
 
 

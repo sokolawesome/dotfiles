@@ -40,10 +40,6 @@ complete -c organize_media \
     -x -d "tvdb id for the season added with --add-season"
 
 complete -c organize_media \
-    -s d -l dry-run \
-    -d "show what would be created"
-
-complete -c organize_media \
     -l root \
     -r -F -a "(__fish_complete_directories)" \
     -d "directory to create folders in"

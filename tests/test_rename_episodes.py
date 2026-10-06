@@ -253,17 +253,22 @@ def test_find_collisions_ignores_different_seasons(tmp_path):
     assert rename_episodes.find_collisions(entries) == []
 
 
+def respond(monkeypatch, answer):
+    monkeypatch.setattr("sys.stdin", io.StringIO(f"{answer}\n"))
+
+
 def build_folder(tmp_path, name="Season 1"):
     folder = tmp_path / name
     folder.mkdir()
     return folder
 
 
-def test_main_detects_season_from_the_folder(tmp_path, capsys):
+def test_main_detects_season_from_the_folder(tmp_path, capsys, monkeypatch):
+    respond(monkeypatch, "y")
     folder = build_folder(tmp_path)
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--dry-run", "--directory", str(folder)])
+    code = rename_episodes.main(["--directory", str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -271,11 +276,12 @@ def test_main_detects_season_from_the_folder(tmp_path, capsys):
     assert "S01E05.mkv" in out
 
 
-def test_main_season_flag_beats_detection(tmp_path, capsys):
+def test_main_season_flag_beats_detection(tmp_path, capsys, monkeypatch):
+    respond(monkeypatch, "y")
     folder = build_folder(tmp_path)
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--dry-run", "--season", "3", "--directory", str(folder)])
+    code = rename_episodes.main(["--season", "3", "--directory", str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -287,7 +293,7 @@ def test_main_errors_when_season_cannot_be_detected(tmp_path, capsys):
     folder = build_folder(tmp_path, "Show Name")
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--dry-run", "--directory", str(folder)])
+    code = rename_episodes.main(["--directory", str(folder)])
 
     err = capsys.readouterr().out
     assert code == 1
@@ -306,16 +312,18 @@ def test_main_absolute_mode(tmp_path, capsys):
     assert [e.target for e in episodes] == ["S01E01.mkv", "S01E02.mkv", "S01E03.mkv"]
 
 
-def test_main_dry_run_changes_nothing(tmp_path, capsys):
+def test_main_answering_no_changes_nothing(tmp_path, capsys, monkeypatch):
+    respond(monkeypatch, "n")
     folder = build_folder(tmp_path)
     (folder / "Show - 05.mkv").write_text("x")
     (folder / "Show.S01E02.mkv").write_text("x")
     (folder / "notes.txt").write_text("x")
 
-    code = rename_episodes.main(["--dry-run", "--directory", str(folder)])
+    code = rename_episodes.main(["--directory", str(folder)])
 
     out = capsys.readouterr().out
-    assert code == 0
+    assert code == 1
+    assert "cancelled" in out
     assert "S01E05.mkv" in out
     assert "S01E02.mkv" in out
     assert sorted(p.name for p in folder.iterdir()) == [
@@ -410,11 +418,11 @@ def test_main_renames_only_the_pending_episodes(tmp_path, capsys, monkeypatch):
     assert sorted(p.name for p in folder.iterdir()) == ["S01E01.mkv", "S01E07.mkv"]
 
 
-def test_main_dry_run_reports_nothing_to_rename(tmp_path, capsys):
+def test_main_reports_nothing_to_rename(tmp_path, capsys):
     folder = build_folder(tmp_path)
     (folder / "S01E03.mkv").write_text("x")
 
-    code = rename_episodes.main(["--dry-run", "--directory", str(folder)])
+    code = rename_episodes.main(["--directory", str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0

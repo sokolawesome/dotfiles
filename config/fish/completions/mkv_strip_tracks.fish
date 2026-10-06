@@ -19,10 +19,6 @@ complete -c mkv_strip_tracks \
     -d "leave files that lack a requested track alone"
 
 complete -c mkv_strip_tracks \
-    -s d -l dry-run \
-    -d "show the plan without stripping"
-
-complete -c mkv_strip_tracks \
     -l directory \
     -x -d "directory to scan"
 

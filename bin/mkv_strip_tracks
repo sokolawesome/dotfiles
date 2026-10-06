@@ -419,7 +419,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--keep-audio", default="", metavar="LANGS", help="comma separated audio languages")
     parser.add_argument("--keep-subs", default="", metavar="LANGS", help="comma separated subtitle languages")
     parser.add_argument("--skip-missing", action="store_true", help="leave files that lack a requested track alone")
-    parser.add_argument("-d", "--dry-run", action="store_true", help="show the plan without stripping")
     parser.add_argument("--directory", type=Path, default=Path("."), help="directory to scan")
     return parser
 
@@ -461,10 +460,6 @@ def run(argv: list[str] | None = None) -> int:
     console.print(Panel(build_plan_table(plans, processed), title="plan", border_style="cyan", padding=(0, 1)))
 
     todo = [plan for plan in plans if plan.path in processed]
-
-    if args.dry_run:
-        console.print(f"[{DROP}]dry run, nothing stripped[/]")
-        return 0
 
     if not todo:
         console.print("[yellow]no file has every requested track[/]")

@@ -19,10 +19,6 @@ complete -c rename_episodes \
     -d "treat episode numbers as absolute, subtract --offset from them"
 
 complete -c rename_episodes \
-    -s n -l dry-run \
-    -d "show the plan without renaming"
-
-complete -c rename_episodes \
     -s d -l directory \
     -r -F -a "(__fish_complete_directories)" \
     -d "directory to scan"

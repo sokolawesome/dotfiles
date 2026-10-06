@@ -419,20 +419,21 @@ def test_probe_reports_bad_json(tmp_path, monkeypatch):
     assert "unreadable" in result.error
 
 
-def test_main_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
+def test_main_declining_changes_nothing(tmp_path, monkeypatch, capsys):
     (tmp_path / "a.mkv").write_text("x")
     monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+    monkeypatch.setattr(mkv.Confirm, "ask", lambda *args, **kwargs: False)
     monkeypatch.setattr(
         mkv.subprocess,
         "run",
         lambda command, **kwargs: type("F", (), {"returncode": 0, "stdout": payload(track(AUDIO, 1, "en")), "stderr": ""})(),
     )
 
-    code = mkv.main(["--dry-run", "--keep-audio", "en", "--directory", str(tmp_path)])
+    code = mkv.main(["--keep-audio", "en", "--directory", str(tmp_path)])
 
     out = capsys.readouterr().out
-    assert code == 0
-    assert "dry run" in out
+    assert code == 1
+    assert "cancelled" in out
     assert (tmp_path / "a.mkv").read_text() == "x"
 
 
@@ -526,11 +527,12 @@ def test_main_reports_an_unreadable_file(tmp_path, monkeypatch, capsys):
         return scan(path, (track(AUDIO, 1, "en"),))
 
     monkeypatch.setattr(mkv, "probe", fake_probe)
+    monkeypatch.setattr(mkv.Confirm, "ask", lambda *args, **kwargs: False)
 
-    code = mkv.main(["--dry-run", "--keep-audio", "en", "--directory", str(tmp_path)])
+    code = mkv.main(["--keep-audio", "en", "--directory", str(tmp_path)])
 
     out = capsys.readouterr().out
-    assert code == 0
+    assert code == 1
     assert "unreadable" in out
     assert "broken" in out
 

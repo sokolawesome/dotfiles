@@ -207,7 +207,7 @@ def test_build_add_season_plan_accepts_a_season_id(tmp_path):
 def test_create_directories_makes_the_tree(tmp_path, capsys):
     plan = organize_media.build_show_plan(tmp_path, "show", "Blue Box", "2024", "429934", "1-2")
 
-    organize_media.create_directories(plan, dry_run=False)
+    organize_media.create_directories(plan)
 
     main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
     assert main_dir.is_dir()
@@ -215,23 +215,11 @@ def test_create_directories_makes_the_tree(tmp_path, capsys):
     assert (main_dir / "Season 02 [tvdbid-429934]").is_dir()
 
 
-def test_create_directories_dry_run_creates_nothing(tmp_path, capsys):
-    plan = organize_media.build_show_plan(
-        tmp_path, "show", "Blue Box", "2024", "429934", "1-2"
-    )
-
-    organize_media.create_directories(plan, dry_run=True)
-
-    out = capsys.readouterr().out
-    assert "would create" in out
-    assert list(tmp_path.iterdir()) == []
-
-
 def test_create_directories_is_repeatable(tmp_path, capsys):
     plan = organize_media.build_show_plan(tmp_path, "movie", "Shrek", "2001", "12345", "")
 
-    organize_media.create_directories(plan, dry_run=False)
-    organize_media.create_directories(plan, dry_run=False)
+    organize_media.create_directories(plan)
+    organize_media.create_directories(plan)
 
     assert "exists" in capsys.readouterr().out
 
@@ -296,16 +284,15 @@ def test_main_reports_a_bad_season_range(tmp_path, capsys):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_main_dry_run_creates_nothing(tmp_path, monkeypatch):
-    def refuse(question):
-        raise AssertionError("dry run must not ask for confirmation")
+def test_main_declining_creates_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(organize_media, "asks_yes", lambda question: False)
 
-    monkeypatch.setattr(organize_media, "asks_yes", refuse)
     code = organize_media.main(
-        ["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", "-d", "--root", str(tmp_path)]
+        ["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", "--root", str(tmp_path)]
     )
 
-    assert code == 0
+    assert code == 1
+    assert "cancelled" in capsys.readouterr().out
     assert list(tmp_path.iterdir()) == []
 
 

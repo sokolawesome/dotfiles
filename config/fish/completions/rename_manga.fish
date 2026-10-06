@@ -5,10 +5,6 @@ complete -c rename_manga \
     -d "show this help message"
 
 complete -c rename_manga \
-    -s n -l dry-run \
-    -d "show the plan without renaming"
-
-complete -c rename_manga \
     -s d -l directory \
     -r -F -a "(__fish_complete_directories)" \
     -d "directory to scan"

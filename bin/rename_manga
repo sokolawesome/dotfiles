@@ -194,7 +194,6 @@ def build_parser() -> argparse.ArgumentParser:
         description="rename manga files in the current directory to a clean format",
         epilog="volumes become 01.cbz, chapters become c001.cbz",
     )
-    parser.add_argument("-n", "--dry-run", action="store_true", help="show the plan without renaming")
     parser.add_argument("-d", "--directory", type=Path, default=Path("."), help="directory to scan")
     return parser
 
@@ -240,10 +239,6 @@ def run(argv: list[str] | None = None) -> int:
     if collisions:
         show_collisions(collisions)
         return 1
-
-    if args.dry_run:
-        console.print(f"[{SKIPPED}]dry run, nothing renamed[/]")
-        return 0
 
     if not confirm("proceed?"):
         console.print("[yellow]cancelled[/]")

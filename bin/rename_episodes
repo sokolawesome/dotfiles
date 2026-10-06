@@ -307,7 +307,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-s", "--season", type=int, help="season number, detected from the directory name if absent")
     parser.add_argument("-o", "--offset", type=int, default=0, help="add this to every episode number")
     parser.add_argument("--absolute", action="store_true", help="treat episode numbers as absolute, subtract --offset from them")
-    parser.add_argument("-n", "--dry-run", action="store_true", help="show the plan without renaming")
     parser.add_argument("-d", "--directory", type=Path, default=Path("."), help="directory to scan")
     return parser
 
@@ -360,10 +359,6 @@ def run(argv: list[str] | None = None) -> int:
     if collisions:
         show_collisions(collisions)
         return 1
-
-    if args.dry_run:
-        console.print(f"[{SKIPPED}]dry run, nothing renamed[/]")
-        return 0
 
     if not confirm("proceed?"):
         console.print("[yellow]cancelled[/]")
