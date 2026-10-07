@@ -177,7 +177,7 @@ def test_main_answering_no_changes_nothing(tmp_path, capsys, monkeypatch):
     (tmp_path / "chapter 2.cbz").write_text("x")
     (tmp_path / "extra.cbz").write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     out = capsys.readouterr().out
     assert code == 1
@@ -196,7 +196,7 @@ def test_main_aborts_on_collision_before_renaming(tmp_path, capsys):
     (tmp_path / "v01.cbz").write_text("x")
     (tmp_path / "vol.1.cbz").write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     err = capsys.readouterr().out
     assert code == 1
@@ -205,7 +205,7 @@ def test_main_aborts_on_collision_before_renaming(tmp_path, capsys):
 
 
 def test_main_reports_empty_directory(tmp_path, capsys):
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     assert code == 1
     assert "no manga files" in capsys.readouterr().out
@@ -214,14 +214,14 @@ def test_main_reports_empty_directory(tmp_path, capsys):
 def test_main_reports_when_nothing_parses(tmp_path, capsys):
     (tmp_path / "extra.cbz").write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     assert code == 1
     assert "could not extract" in capsys.readouterr().out
 
 
 def test_main_rejects_missing_directory(tmp_path, capsys):
-    code = rename_manga.main(["--directory", str(tmp_path / "nope")])
+    code = rename_manga.main([str(tmp_path / "nope")])
 
     assert code == 1
     assert "not a directory" in capsys.readouterr().out
@@ -295,7 +295,7 @@ def test_main_exits_early_when_everything_is_named(tmp_path, capsys):
     for name in ("01.cbz", "02.cbz", "c001.cbz"):
         (tmp_path / name).write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -308,7 +308,7 @@ def test_main_exits_early_when_everything_is_named(tmp_path, capsys):
 def test_main_early_exit_uses_singular_for_one_file(tmp_path, capsys):
     (tmp_path / "01.cbz").write_text("x")
 
-    rename_manga.main(["--directory", str(tmp_path)])
+    rename_manga.main([str(tmp_path)])
 
     assert "1 file already named" in capsys.readouterr().out
 
@@ -318,7 +318,7 @@ def test_main_renames_only_the_pending_files(tmp_path, capsys, monkeypatch):
     (tmp_path / "01.cbz").write_text("x")
     (tmp_path / "One-Punch Man 208 (2025).cbz").write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -329,7 +329,7 @@ def test_main_renames_only_the_pending_files(tmp_path, capsys, monkeypatch):
 def test_main_reports_nothing_to_rename(tmp_path, capsys):
     (tmp_path / "c001.cbz").write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -340,7 +340,7 @@ def test_main_treats_missing_stdin_as_cancelled(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     (tmp_path / "One Punch Man 208.cbz").write_text("x")
 
-    code = rename_manga.main(["--directory", str(tmp_path)])
+    code = rename_manga.main([str(tmp_path)])
 
     out = capsys.readouterr().out
     assert code == 130

@@ -191,10 +191,10 @@ def confirm(question: str) -> bool:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rename_manga",
-        description="rename manga files in the current directory to a clean format",
-        epilog="volumes become 01.cbz, chapters become c001.cbz",
+        description="rename manga files to a clean format",
+        epilog="volumes become 01.cbz, chapters become c001.cbz; pass a directory to scan it, defaults to the current one",
     )
-    parser.add_argument("-d", "--directory", type=Path, default=Path("."), help="directory to scan")
+    parser.add_argument("directory", nargs="?", type=Path, default=Path("."), help="directory to scan")
     return parser
 
 
@@ -220,7 +220,7 @@ def run(argv: list[str] | None = None) -> int:
 
     paths = scan_manga_files(directory)
     if not paths:
-        console.print("[red]error:[/] no manga files found in current directory")
+        console.print(f"[red]error:[/] no manga files found in {escape(str(directory))}")
         return 1
 
     entries, skipped = classify(paths)
