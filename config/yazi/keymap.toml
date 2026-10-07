@@ -1,0 +1,9 @@
+[[mgr.prepend_keymap]]
+    on   = ["g", "w"]
+    run  = "cd ~/code"
+    desc = "Go to code"
+
+[[mgr.prepend_keymap]]
+    on   = ["g", "C"]
+    run  = "cd ~/dotfiles"
+    desc = "Go to dotfiles"
