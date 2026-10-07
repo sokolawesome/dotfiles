@@ -66,7 +66,7 @@ optional footer
 - fix: bug fix
 - docs: documentation only
 - style: formatting only, no behavior change (whitespace, indentation)
-- refactor: code restructuring without changing behavior
+- ref: code restructuring without changing behavior
 - perf: performance improvement
 - test: add or change tests
 - build: build system or dependencies
