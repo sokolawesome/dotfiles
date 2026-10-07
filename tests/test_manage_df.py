@@ -17,7 +17,7 @@ ACTIONS = manage_df.ACTIONS
         ("dry-run", "-n", "dry-run"),
     ],
 )
-def test_action_flags_match_the_fish_version(name, flag, verb):
+def test_action_flags(name, flag, verb):
     assert ACTIONS[name].flag == flag
     assert ACTIONS[name].verb == verb
 
@@ -31,7 +31,7 @@ def test_action_flags_match_the_fish_version(name, flag, verb):
         ("agents", str(pathlib.Path.home() / ".agents")),
     ],
 )
-def test_package_targets_match_the_fish_version(name, expected):
+def test_package_targets(name, expected):
     assert str(manage_df.PACKAGES[name]) == expected
 
 
@@ -103,8 +103,10 @@ def test_find_stow_fails_when_absent(monkeypatch):
     assert "gnu stow not found" in str(error.value)
 
 
-def test_find_stow_returns_the_path():
-    assert manage_df.find_stow().endswith("stow")
+def test_find_stow_returns_the_path(monkeypatch):
+    monkeypatch.setattr(manage_df.shutil, "which", lambda name: "/usr/bin/stow")
+
+    assert manage_df.find_stow() == "/usr/bin/stow"
 
 
 def test_ensure_target_creates_nested_parents(tmp_path):
@@ -126,7 +128,6 @@ def test_ensure_target_never_creates_bin_inside_bin(tmp_path):
 
 def test_run_package_reports_a_missing_source(tmp_path, monkeypatch):
     monkeypatch.setattr(manage_df, "PACKAGES", {"config": tmp_path / "config"})
-    monkeypatch.setenv("DOTFILES_PATH", str(tmp_path / "empty-repo"))
 
     result = manage_df.run_package(tmp_path / "empty-repo", "config", ACTIONS["stow"], False)
 
@@ -138,7 +139,6 @@ def test_run_package_marks_a_failure(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     (repo / "config").mkdir(parents=True)
     monkeypatch.setattr(manage_df, "PACKAGES", {"config": tmp_path / "target"})
-    monkeypatch.setenv("DOTFILES_PATH", str(repo))
 
     class Finished:
         returncode = 1
@@ -157,7 +157,6 @@ def test_run_package_succeeds(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     (repo / "bin").mkdir(parents=True)
     monkeypatch.setattr(manage_df, "PACKAGES", {"bin": tmp_path / "target" / "bin"})
-    monkeypatch.setenv("DOTFILES_PATH", str(repo))
 
     class Finished:
         returncode = 0
