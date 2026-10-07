@@ -570,6 +570,56 @@ def test_strip_one_reports_progress(tmp_path, monkeypatch):
     assert seen == [12, 88]
 
 
+def fake_progress(made):
+    class Progress:
+        def __init__(self, *args, **kwargs):
+            self.tasks = []
+            made.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def add_task(self, description, total=None):
+            self.tasks.append(description)
+            return len(self.tasks)
+
+        def update(self, task, **kwargs):
+            pass
+
+        def remove_task(self, task):
+            pass
+
+        def advance(self, task):
+            pass
+
+    return Progress
+
+
+def test_strip_all_shows_one_bar_for_a_single_file(tmp_path, monkeypatch):
+    made = []
+    monkeypatch.setattr(mkv, "Progress", fake_progress(made))
+    monkeypatch.setattr(mkv, "strip_one", lambda plan, mkvmerge, report=None: (True, ""))
+    plan = mkv.FilePlan(tmp_path / "a.mkv", (), ())
+
+    mkv.strip_all([plan], "mkvmerge")
+
+    assert made[0].tasks == ["a.mkv"]
+
+
+def test_strip_all_shows_the_overall_bar_for_several_files(tmp_path, monkeypatch):
+    made = []
+    monkeypatch.setattr(mkv, "Progress", fake_progress(made))
+    monkeypatch.setattr(mkv, "strip_one", lambda plan, mkvmerge, report=None: (True, ""))
+    plans = [mkv.FilePlan(tmp_path / "a.mkv", (), ()), mkv.FilePlan(tmp_path / "b.mkv", (), ())]
+
+    mkv.strip_all(plans, "mkvmerge")
+
+    assert made[0].tasks == ["stripping", "a.mkv", "b.mkv"]
+
+
 def test_line_buffered_prefixes_stdbuf(monkeypatch):
     monkeypatch.setattr(mkv.shutil, "which", lambda name: "/usr/bin/stdbuf")
 

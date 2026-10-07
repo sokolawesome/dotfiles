@@ -397,16 +397,18 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
         console=console,
         transient=True,
     ) as progress:
-        overall = progress.add_task("stripping", total=len(plans))
+        overall = None if len(plans) == 1 else progress.add_task("stripping", total=len(plans))
         for index, plan in enumerate(plans, start=1):
-            progress.update(overall, description=f"{index}/{len(plans)}")
+            if overall is not None:
+                progress.update(overall, description=f"{index}/{len(plans)}")
             task = progress.add_task(escape(plan.path.name), total=100)
             ok, detail = strip_one(plan, mkvmerge, lambda percent: progress.update(task, completed=percent))
             progress.remove_task(task)
             if not ok:
                 failures += 1
                 console.print(f"[{FAIL}]x[/] {escape(plan.path.name)}: {escape(detail)}")
-            progress.advance(overall)
+            if overall is not None:
+                progress.advance(overall)
     return failures
 
 
