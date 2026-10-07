@@ -32,16 +32,6 @@ complete -c organize_media \
 
 complete -c organize_media \
     -l add-season \
-    -x -d "add a season to an existing show" \
-    -a "(__fish_complete_directories)"
+    -x -d "add seasons to an existing show, needs -s and -i"
 
-complete -c organize_media \
-    -l season-id \
-    -x -d "tvdb id for the season added with --add-season"
-
-complete -c organize_media \
-    -l root \
-    -r -F -a "(__fish_complete_directories)" \
-    -d "directory to create folders in"
-
-complete -c organize_media -k -f
+complete -c organize_media -k -f -a "(__fish_complete_directories)"
