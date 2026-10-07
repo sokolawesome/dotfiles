@@ -29,6 +29,9 @@
 [open]
 	prepend_rules = [{ url = "*/", use = "open" }, { mime = "image/*", use = ["open", "exif", "reveal"] }]
 
+[plugin]
+	prepend_previewers = [{ mime = "video/*", run = "noop" }]
+
 [input]
 	cd_offset     = [0, 0, 50, 3]
 	cd_origin     = "center"
