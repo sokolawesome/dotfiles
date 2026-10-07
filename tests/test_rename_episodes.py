@@ -268,7 +268,7 @@ def test_main_detects_season_from_the_folder(tmp_path, capsys, monkeypatch):
     folder = build_folder(tmp_path)
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -281,7 +281,7 @@ def test_main_season_flag_beats_detection(tmp_path, capsys, monkeypatch):
     folder = build_folder(tmp_path)
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--season", "3", "--directory", str(folder)])
+    code = rename_episodes.main(["--season", "3", str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -293,7 +293,7 @@ def test_main_errors_when_season_cannot_be_detected(tmp_path, capsys):
     folder = build_folder(tmp_path, "Show Name")
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     err = capsys.readouterr().out
     assert code == 1
@@ -301,15 +301,16 @@ def test_main_errors_when_season_cannot_be_detected(tmp_path, capsys):
     assert "use -s/--season" in err
 
 
-def test_main_absolute_mode(tmp_path, capsys):
+def test_main_negative_offset_subtracts(tmp_path, capsys, monkeypatch):
+    respond(monkeypatch, "y")
     folder = build_folder(tmp_path)
     for number in (101, 102, 103):
         (folder / f"Show - {number}.mkv").write_text("x")
-    paths = sorted(folder.iterdir())
 
-    episodes, _ = rename_episodes.classify(paths, "01", -100)
+    code = rename_episodes.main(["--offset", "-100", str(folder)])
 
-    assert [e.target for e in episodes] == ["S01E01.mkv", "S01E02.mkv", "S01E03.mkv"]
+    assert code == 0
+    assert sorted(p.name for p in folder.iterdir()) == ["S01E01.mkv", "S01E02.mkv", "S01E03.mkv"]
 
 
 def test_main_answering_no_changes_nothing(tmp_path, capsys, monkeypatch):
@@ -319,7 +320,7 @@ def test_main_answering_no_changes_nothing(tmp_path, capsys, monkeypatch):
     (folder / "Show.S01E02.mkv").write_text("x")
     (folder / "notes.txt").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     out = capsys.readouterr().out
     assert code == 1
@@ -338,7 +339,7 @@ def test_main_aborts_on_collision(tmp_path, capsys):
     (folder / "Show - 05.mkv").write_text("x")
     (folder / "Show [05].mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     err = capsys.readouterr().out
     assert code == 1
@@ -349,7 +350,7 @@ def test_main_aborts_on_collision(tmp_path, capsys):
 def test_main_reports_empty_directory(tmp_path, capsys):
     folder = build_folder(tmp_path)
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     assert code == 1
     assert "no media files" in capsys.readouterr().out
@@ -385,7 +386,7 @@ def test_main_exits_early_when_everything_is_named(tmp_path, capsys):
     (folder / "S01E01.mkv").write_text("x")
     (folder / "S01E02.mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -399,7 +400,7 @@ def test_main_early_exit_uses_singular_for_one_file(tmp_path, capsys):
     folder = build_folder(tmp_path)
     (folder / "S01E01.mkv").write_text("x")
 
-    rename_episodes.main(["--directory", str(folder)])
+    rename_episodes.main([str(folder)])
 
     assert "1 file already named" in capsys.readouterr().out
 
@@ -410,7 +411,7 @@ def test_main_renames_only_the_pending_episodes(tmp_path, capsys, monkeypatch):
     (folder / "S01E01.mkv").write_text("x")
     (folder / "Show - 07.mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -422,7 +423,7 @@ def test_main_reports_nothing_to_rename(tmp_path, capsys):
     folder = build_folder(tmp_path)
     (folder / "S01E03.mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     out = capsys.readouterr().out
     assert code == 0
@@ -493,7 +494,7 @@ def test_main_treats_missing_stdin_as_cancelled(tmp_path, capsys, monkeypatch):
     folder = build_folder(tmp_path)
     (folder / "Show - 05.mkv").write_text("x")
 
-    code = rename_episodes.main(["--directory", str(folder)])
+    code = rename_episodes.main([str(folder)])
 
     out = capsys.readouterr().out
     assert code == 130

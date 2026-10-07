@@ -11,16 +11,7 @@ complete -c rename_episodes \
 
 complete -c rename_episodes \
     -s o -l offset \
-    -x -d "add this to every episode number" \
+    -x -d "add this to every episode number, negative to subtract" \
     -a "-100 -12 0 12 24"
 
-complete -c rename_episodes \
-    -l absolute \
-    -d "treat episode numbers as absolute, subtract --offset from them"
-
-complete -c rename_episodes \
-    -s d -l directory \
-    -r -F -a "(__fish_complete_directories)" \
-    -d "directory to scan"
-
-complete -c rename_episodes -k -f
+complete -c rename_episodes -k -f -a "(__fish_complete_directories)"

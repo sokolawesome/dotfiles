@@ -302,12 +302,12 @@ def confirm(question: str) -> bool:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rename_episodes",
-        description="rename episode files in the current directory to S01E01 format",
+        description="rename episode files to S01E01 format",
+        epilog="pass a directory to scan it, defaults to the current one",
     )
+    parser.add_argument("directory", nargs="?", type=Path, default=Path("."), help="directory to scan")
     parser.add_argument("-s", "--season", type=int, help="season number, detected from the directory name if absent")
-    parser.add_argument("-o", "--offset", type=int, default=0, help="add this to every episode number")
-    parser.add_argument("--absolute", action="store_true", help="treat episode numbers as absolute, subtract --offset from them")
-    parser.add_argument("-d", "--directory", type=Path, default=Path("."), help="directory to scan")
+    parser.add_argument("-o", "--offset", type=int, default=0, help="add this to every episode number, negative to subtract")
     return parser
 
 
@@ -337,12 +337,10 @@ def run(argv: list[str] | None = None) -> int:
 
     paths = scan_media_files(directory)
     if not paths:
-        console.print("[red]error:[/] no media files found in current directory")
+        console.print(f"[red]error:[/] no media files found in {escape(str(directory))}")
         return 1
 
-    absolute_base = args.offset if args.absolute else None
-    episode_offset = 0 if absolute_base is None else absolute_base
-    episodes, skipped = classify(paths, season, episode_offset)
+    episodes, skipped = classify(paths, season, args.offset)
 
     if not episodes:
         console.print("[red]error:[/] could not extract episode numbers from any files")
