@@ -98,10 +98,11 @@ def unit_files(system_scope: bool) -> list[str]:
 
 
 def collect(target: Path) -> list[Artifact]:
+    other = target / "other"
+    other.mkdir(parents=True, exist_ok=True)
     all_names = installed_packages(foreign=False)
     aur_names = installed_packages(foreign=True)
     services = enabled_services()
-    other = target / "other"
     return [
         Artifact("official pacman packages", other / "pacman-packages.txt", "".join(f"{n}\n" for n in repo_packages(all_names, aur_names))),
         Artifact("aur packages", other / "yay-packages.txt", "".join(f"{n}\n" for n in aur_names)),

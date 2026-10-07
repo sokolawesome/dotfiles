@@ -248,6 +248,27 @@ def test_collect_writes_all_four_files(tmp_path, monkeypatch):
     assert artifacts[0].content == "keep-me\nz-foreign\n"
 
 
+def test_collect_creates_the_other_directory(tmp_path, monkeypatch):
+    monkeypatch.setattr(backup_system_state, "installed_packages", lambda foreign: [])
+    monkeypatch.setattr(backup_system_state, "user_groups", lambda: [])
+    monkeypatch.setattr(backup_system_state, "enabled_services", lambda: [])
+
+    backup_system_state.collect(tmp_path)
+
+    assert (tmp_path / "other").is_dir()
+
+
+def test_main_creates_the_other_directory(tmp_path, monkeypatch):
+    monkeypatch.setattr(backup_system_state, "installed_packages", lambda foreign: [] if foreign else ["a"])
+    monkeypatch.setattr(backup_system_state, "user_groups", lambda: [])
+    monkeypatch.setattr(backup_system_state, "enabled_services", lambda: [])
+
+    code = backup_system_state.main(["--dotfiles", str(tmp_path)])
+
+    assert code == 0
+    assert (tmp_path / "other" / "pacman-packages.txt").read_text() == "a\n"
+
+
 def test_main_reports_a_missing_repo(tmp_path, capsys):
     code = backup_system_state.main(["--dotfiles", str(tmp_path / "nope")])
 
