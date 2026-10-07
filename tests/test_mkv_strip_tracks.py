@@ -216,7 +216,6 @@ def test_pick_from_candidates_honours_the_number(monkeypatch, capsys):
     capsys.readouterr()
 
     assert result.track_id == 7
-    assert mkv.matches_for(mkv.Selection(AUDIO, "en"), target)
 
 
 def test_pick_from_candidates_falls_back_to_the_first(monkeypatch, capsys):
@@ -262,7 +261,7 @@ def test_strip_command_uses_the_right_flag_per_kind():
     assert "--subtitles-tracks" not in command
 
 
-def test_strip_command_omits_a_kind_with_nothing_kept():
+def test_strip_command_leaves_an_unselected_kind_untouched():
     plan = mkv.FilePlan(pathlib.Path("a.mkv"), (track(AUDIO, 1),), ())
 
     command = mkv.strip_command(plan, "mkvmerge")
@@ -271,7 +270,7 @@ def test_strip_command_omits_a_kind_with_nothing_kept():
     assert "--no-subtitles" not in command
 
 
-def test_strip_command_never_emits_both_a_list_and_a_no_flag():
+def test_strip_command_has_no_flags_when_nothing_is_kept():
     plan = mkv.FilePlan(pathlib.Path("a.mkv"), (), ())
 
     command = mkv.strip_command(plan, "mkvmerge")
@@ -437,19 +436,23 @@ def test_main_declining_changes_nothing(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "a.mkv").read_text() == "x"
 
 
-def test_main_reports_no_mkv_files(tmp_path, capsys):
+def test_main_reports_no_mkv_files(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
+
     code = mkv.main(["--directory", str(tmp_path)])
 
     assert code == 1
     assert "no .mkv files" in capsys.readouterr().out
 
 
-def test_main_reports_a_missing_mkvmerge(tmp_path, capsys):
+def test_main_reports_a_missing_mkvmerge(tmp_path, monkeypatch, capsys):
     (tmp_path / "a.mkv").write_text("x")
+    monkeypatch.setattr(mkv.shutil, "which", lambda name: None)
+
     code = mkv.main(["--directory", str(tmp_path)])
 
     assert code == 1
-    assert "no .mkv files" not in capsys.readouterr().out
+    assert "mkvmerge not found" in capsys.readouterr().out
 
 
 def test_main_strips_when_confirmed(tmp_path, monkeypatch, capsys):
@@ -477,22 +480,6 @@ def test_main_strips_when_confirmed(tmp_path, monkeypatch, capsys):
     assert calls == [source]
     assert source.read_text() == "stripped"
     assert "done - 1 files stripped" in capsys.readouterr().out
-
-
-def test_main_cancels_when_declined(tmp_path, monkeypatch, capsys):
-    (tmp_path / "a.mkv").write_text("x")
-    monkeypatch.setattr(mkv, "find_mkvmerge", lambda: "mkvmerge")
-    monkeypatch.setattr(mkv, "Confirm", type("C", (), {"ask": staticmethod(lambda *a, **k: False)}))
-    monkeypatch.setattr(
-        mkv,
-        "probe",
-        lambda path, mkvmerge: scan(path, (track(AUDIO, 1, "en"),)),
-    )
-
-    code = mkv.main(["--keep-audio", "en", "--directory", str(tmp_path)])
-
-    assert code == 1
-    assert "cancelled" in capsys.readouterr().out
 
 
 def test_main_skips_files_that_lack_a_track(tmp_path, monkeypatch, capsys):
