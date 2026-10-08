@@ -21,7 +21,6 @@ console = Console()
 
 QUESTION = "bold cyan"
 KEEP = "bold green"
-DROP = "yellow"
 FAIL = "red"
 DIM = "dim"
 
@@ -32,6 +31,12 @@ AUDIO = "audio"
 SUBTITLES = "subtitles"
 SELECTABLE_TYPES = (AUDIO, SUBTITLES)
 MKVMERGE_FLAGS = {AUDIO: "--audio-tracks", SUBTITLES: "--subtitle-tracks"}
+SUPPORTED_SUBTITLE_LANGUAGES = (
+    "en", "eng",
+    "ja", "jpn",
+    "ru", "rus",
+    "es", "spa",
+)
 
 
 class StripError(Exception):
@@ -46,10 +51,6 @@ class Track:
     alias: str
     name: str
     codec: str
-
-    @property
-    def key(self) -> tuple[str, str, str]:
-        return (self.kind, self.language, self.name)
 
     @property
     def label(self) -> str:
@@ -73,11 +74,6 @@ class FileScan:
 class Selection:
     kind: str
     language: str
-    name: str = ""
-
-    @property
-    def key(self) -> tuple[str, str, str]:
-        return (self.kind, self.language, self.name)
 
 
 @dataclass(frozen=True)
@@ -109,7 +105,7 @@ def language_of(properties: dict) -> tuple[str, str]:
         full = ietf
     if not ietf:
         ietf = full
-    return (ietf.lower(), full.lower())
+    return (full.lower(), ietf.lower())
 
 
 def parse_tracks(payload: str) -> tuple[Track, ...]:
@@ -117,13 +113,13 @@ def parse_tracks(payload: str) -> tuple[Track, ...]:
     tracks = []
     for entry in document.get("tracks", []):
         properties = entry.get("properties", {})
-        ietf, full = language_of(properties)
+        language, alias = language_of(properties)
         tracks.append(
             Track(
                 kind=entry.get("type", ""),
                 track_id=int(entry.get("id", -1)),
-                language=ietf,
-                alias=full,
+                language=language,
+                alias=alias,
                 name=(properties.get("track_name") or "").replace("|", "/"),
                 codec=properties.get("codec_id", ""),
             )
@@ -142,44 +138,53 @@ def probe(path: Path, mkvmerge: str) -> FileScan:
         return FileScan(path, (), f"unreadable track list: {error}")
 
 
-def scan_files(directory: Path, names: list[str]) -> list[Path]:
-    if not names:
-        return [p for p in sorted(directory.iterdir()) if p.is_file() and p.suffix == MKV_SUFFIX]
-    chosen = [directory / name if not Path(name).is_absolute() and (directory / name).exists() else Path(name) for name in names]
-    missing = [p.name for p in chosen if not p.is_file()]
-    if missing:
-        raise StripError(f"not a file: {', '.join(missing)}")
-    wrong = [p.name for p in chosen if p.suffix != MKV_SUFFIX]
-    if wrong:
-        raise StripError(f"not an .mkv file: {', '.join(wrong)}")
-    return chosen
+def scan_files(directory: Path) -> list[Path]:
+    if not directory.is_dir():
+        raise StripError(f"not a directory: {directory}")
+    return [p for p in sorted(directory.iterdir()) if p.is_file() and p.suffix == MKV_SUFFIX]
 
 
 def collect(paths: list[Path], mkvmerge: str) -> list[FileScan]:
     return [probe(path, mkvmerge) for path in paths]
 
 
+def supported_subtitle(track: Track) -> bool:
+    return (
+        track.language.lower() in SUPPORTED_SUBTITLE_LANGUAGES
+        or track.alias.lower() in SUPPORTED_SUBTITLE_LANGUAGES
+    )
+
+
+def selectable(track: Track) -> bool:
+    if track.kind == AUDIO:
+        return True
+    return track.kind == SUBTITLES and supported_subtitle(track)
+
+
 def union_of(scans: list[FileScan]) -> list[Selection]:
-    keys: dict[tuple[str, str, str], None] = {}
+    keys: dict[tuple[str, str], None] = {}
     for scan in scans:
         for track in scan.tracks:
-            if track.kind in SELECTABLE_TYPES:
-                keys.setdefault(track.key, None)
+            if selectable(track):
+                keys.setdefault((track.kind, track.language), None)
     return [Selection(*key) for key in keys]
 
 
-def presence_of(selection: Selection, scans: list[FileScan]) -> int:
-    return sum(1 for scan in scans if any(track.key == selection.key for track in scan.tracks))
-
-
 def matches_for(selection: Selection, scan: FileScan) -> list[Track]:
-    if selection.name:
-        return [
-            track
-            for track in scan.tracks
-            if track.kind == selection.kind and track.name == selection.name and track.speaks(selection.language)
-        ]
     return [track for track in scan.tracks if track.kind == selection.kind and track.speaks(selection.language)]
+
+
+def presence_of(selection: Selection, scans: list[FileScan]) -> int:
+    return sum(1 for scan in scans if matches_for(selection, scan))
+
+
+def labels_for(selection: Selection, scans: list[FileScan]) -> list[str]:
+    labels = []
+    for scan in scans:
+        for track in matches_for(selection, scan):
+            if track.label not in labels:
+                labels.append(track.label)
+    return labels
 
 
 def choose_interactively(scans: list[FileScan], union: list[Selection]) -> list[Selection]:
@@ -194,7 +199,7 @@ def choose_interactively(scans: list[FileScan], union: list[Selection]) -> list[
             str(number),
             f"[{KEEP}]{escape(selection.kind)}[/]",
             escape(selection.language),
-            escape(selection.name or "unnamed"),
+            escape(", ".join(labels_for(selection, scans)) or "unnamed"),
             f"[{DIM}]{presence_of(selection, scans)} files[/]",
         )
     console.print(Panel(table, title="tracks across all files", border_style="cyan", padding=(0, 1)))
@@ -224,15 +229,23 @@ def resolve_picks(
     for selection in selections:
         candidates = matches_for(selection, scan)
         if not candidates:
+            if ask:
+                chosen.extend(pick_from_available(selection, scan))
             continue
         if len(candidates) > 1 and ask:
-            chosen.append(pick_from_candidates(selection, scan, candidates))
+            chosen.extend(pick_from_candidates(selection, scan, candidates))
         else:
-            chosen.append(candidates[0])
-    return chosen
+            chosen.extend(candidates)
+    unique = []
+    seen = set()
+    for track in chosen:
+        if track.track_id not in seen:
+            seen.add(track.track_id)
+            unique.append(track)
+    return unique
 
 
-def pick_from_candidates(selection: Selection, scan: FileScan, candidates: list[Track]) -> Track:
+def pick_from_candidates(selection: Selection, scan: FileScan, candidates: list[Track]) -> list[Track]:
     table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
     table.add_column(justify="right", width=4)
     table.add_column(overflow="ellipsis")
@@ -242,15 +255,53 @@ def pick_from_candidates(selection: Selection, scan: FileScan, candidates: list[
     console.print(
         Panel(
             table,
-            title=f"{scan.path.name}: {len(candidates)} {selection.kind} tracks match {selection.language} {selection.name or 'unnamed'}",
+            title=f"{scan.path.name}: {len(candidates)} {selection.kind} tracks in {selection.language}",
             border_style=FAIL,
             padding=(0, 1),
         )
     )
-    answer = Prompt.ask(f"[{QUESTION}]keep which one[/]").strip()
-    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
-        return candidates[int(answer) - 1]
-    return candidates[0]
+    while True:
+        answer = Prompt.ask(f"[{QUESTION}]keep which[/] [dim](numbers, 'all')[/]").strip().lower()
+        if answer in ("", "all"):
+            return list(candidates)
+        parts = answer.replace(",", " ").split()
+        if all(part.isdigit() and 1 <= int(part) <= len(candidates) for part in parts):
+            return [candidates[int(part) - 1] for part in parts]
+        console.print(f"[{FAIL}]pick numbers between 1 and {len(candidates)}, or 'all'[/]")
+
+
+def pick_from_available(selection: Selection, scan: FileScan) -> list[Track]:
+    available = [track for track in scan.tracks if track.kind == selection.kind]
+    if not available:
+        return []
+    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table.add_column(justify="right", width=4)
+    table.add_column(width=10)
+    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="ellipsis")
+    for number, track in enumerate(available, start=1):
+        table.add_row(
+            str(number),
+            escape(track.language),
+            escape(track.label),
+            f"[{DIM}]{escape(track.codec)}[/]",
+        )
+    console.print(
+        Panel(
+            table,
+            title=f"{scan.path.name}: no {selection.language} {selection.kind}, pick a replacement",
+            border_style=FAIL,
+            padding=(0, 1),
+        )
+    )
+    while True:
+        answer = Prompt.ask(f"[{QUESTION}]keep which[/] [dim](numbers, 'none')[/]").strip().lower()
+        if answer in ("", "none"):
+            return []
+        parts = answer.replace(",", " ").split()
+        if all(part.isdigit() and 1 <= int(part) <= len(available) for part in parts):
+            return [available[int(part) - 1] for part in parts]
+        console.print(f"[{FAIL}]pick numbers between 1 and {len(available)}, or 'none'[/]")
 
 
 def build_plan(scans: list[FileScan], selections: list[Selection], ask: bool) -> list[FilePlan]:
@@ -337,27 +388,36 @@ def describe_missing(plan: FilePlan) -> str:
     return ", ".join(parts)
 
 
-def build_plan_table(plans: list[FilePlan], processed: set[Path]) -> Table:
+def track_summary(tracks: list[Track]) -> str:
+    return ", ".join(f"{track.language} {track.label}" for track in tracks) or "-"
+
+
+def plan_signature(plan: FilePlan) -> tuple:
+    kept = tuple((track.kind, track.language, track.name) for track in plan.keep)
+    missing = tuple((selection.kind, selection.language) for selection in plan.missing)
+    return kept, missing
+
+
+def build_plan_table(plans: list[FilePlan]) -> Table:
+    groups: dict[tuple, list[FilePlan]] = {}
+    for plan in plans:
+        groups.setdefault(plan_signature(plan), []).append(plan)
+
     table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
     table.add_column(overflow="ellipsis", ratio=1, min_width=24)
-    table.add_column(justify="right", width=8)
-    table.add_column(justify="right", width=11)
+    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="ellipsis")
     table.add_column(overflow="fold")
-    for plan in plans:
-        audio = len(plan.ids_for(AUDIO))
-        subs = len(plan.ids_for(SUBTITLES))
-        if plan.path not in processed:
-            note = f"[{DROP}]skipped, {len(plan.missing)} missing[/]"
-        elif plan.missing:
-            note = f"[{DIM}]{len(plan.missing)} missing:[/] [dim]{escape(describe_missing(plan))}[/]"
+    for members in groups.values():
+        first = members[0]
+        heading = first.path.name if len(members) == 1 else f"{len(members)} files"
+        audio = track_summary([track for track in first.keep if track.kind == AUDIO])
+        subs = track_summary([track for track in first.keep if track.kind == SUBTITLES])
+        if first.missing:
+            note = f"[{DIM}]missing:[/] [dim]{escape(describe_missing(first))}[/]"
         else:
             note = f"[{DIM}]clean[/]"
-        table.add_row(
-            escape(plan.path.name),
-            f"[{KEEP}]{audio} audio[/]",
-            f"[{KEEP}]{subs} subtitles[/]",
-            note,
-        )
+        table.add_row(escape(heading), f"audio {escape(audio)}", f"subs {escape(subs)}", note)
     return table
 
 
@@ -376,17 +436,6 @@ def report_unreadable(scans: list[FileScan]) -> None:
         console.print(Panel(build_problem_table(scans), title="unreadable", border_style=FAIL, padding=(0, 1)))
 
 
-def selections_from_flags(args: argparse.Namespace) -> list[Selection] | None:
-    picks = []
-    for spec in args.keep_audio.split(","):
-        if spec.strip():
-            picks.append(Selection(AUDIO, spec.strip().lower()))
-    for spec in args.keep_subs.split(","):
-        if spec.strip():
-            picks.append(Selection(SUBTITLES, spec.strip().lower()))
-    return picks or None
-
-
 def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
     failures = 0
     with Progress(
@@ -400,7 +449,7 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
         overall = None if len(plans) == 1 else progress.add_task("stripping", total=len(plans))
         for index, plan in enumerate(plans, start=1):
             if overall is not None:
-                progress.update(overall, description=f"{index}/{len(plans)}")
+                progress.update(overall, description=f"{index - 1}/{len(plans)}")
             task = progress.add_task(escape(plan.path.name), total=100)
             ok, detail = strip_one(plan, mkvmerge, lambda percent: progress.update(task, completed=percent))
             progress.remove_task(task)
@@ -415,13 +464,10 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mkv_strip_tracks",
-        description="strip audio and subtitle tracks from mkv files, matching by language and name",
+        description="strip audio and subtitle tracks from mkv files, matching by language",
+        epilog="pass a directory to scan it, defaults to the current one",
     )
-    parser.add_argument("files", nargs="*", help="files to process, defaults to every .mkv in the directory")
-    parser.add_argument("--keep-audio", default="", metavar="LANGS", help="comma separated audio languages")
-    parser.add_argument("--keep-subs", default="", metavar="LANGS", help="comma separated subtitle languages")
-    parser.add_argument("--skip-missing", action="store_true", help="leave files that lack a requested track alone")
-    parser.add_argument("--directory", type=Path, default=Path("."), help="directory to scan")
+    parser.add_argument("directory", nargs="?", type=Path, default=Path("."), help="directory to scan")
     return parser
 
 
@@ -430,7 +476,7 @@ def run(argv: list[str] | None = None) -> int:
 
     try:
         mkvmerge = find_mkvmerge()
-        paths = scan_files(args.directory, args.files)
+        paths = scan_files(args.directory)
     except StripError as error:
         console.print(f"[{FAIL}]error:[/] {escape(str(error))}")
         return 1
@@ -447,39 +493,30 @@ def run(argv: list[str] | None = None) -> int:
 
     union = union_of(readable)
     if not union:
-        console.print("[red]error:[/] no audio or subtitle tracks found")
+        console.print("[red]error:[/] no audio or supported subtitle tracks found")
         return 1
 
-    from_flags = selections_from_flags(args)
-    ask = from_flags is None
-    selections = from_flags if from_flags is not None else choose_interactively(readable, union)
+    selections = choose_interactively(readable, union)
     if not selections:
         console.print("[yellow]nothing selected[/]")
         return 0
 
-    plans = build_plan(readable, selections, ask)
-    processed = {plan.path for plan in plans if not (args.skip_missing and plan.missing)}
-    console.print(Panel(build_plan_table(plans, processed), title="plan", border_style="cyan", padding=(0, 1)))
+    plans = build_plan(readable, selections, True)
+    console.print(Panel(build_plan_table(plans), title="plan", border_style="cyan", padding=(0, 1)))
 
-    todo = [plan for plan in plans if plan.path in processed]
-
-    if not todo:
-        console.print("[yellow]no file has every requested track[/]")
-        return 0
-
-    if not Confirm.ask(f"[{QUESTION}]strip {len(todo)} file(s)?[/]", default=False, console=console):
+    if not Confirm.ask(f"[{QUESTION}]strip {len(plans)} file(s)?[/]", default=False, console=console):
         console.print("[yellow]cancelled[/]")
         return 1
 
-    before = size_of([plan.path for plan in todo])
-    failures = strip_all(todo, mkvmerge)
-    after = size_of([plan.path for plan in todo])
+    before = size_of([plan.path for plan in plans])
+    failures = strip_all(plans, mkvmerge)
+    after = size_of([plan.path for plan in plans])
 
     console.print()
     if failures:
         console.print(f"[{FAIL}]done with {failures} error(s)[/]")
     else:
-        console.print(f"[{KEEP}]done - {len(todo)} files stripped[/]")
+        console.print(f"[{KEEP}]done - {len(plans)} files stripped[/]")
     console.print(f"[{QUESTION}]before:[/] {format_size(before)}")
     console.print(f"[{QUESTION}]after:  [/] {format_size(after)}")
     console.print(f"[{QUESTION}]saved:  [/] {format_size(before - after)}")
