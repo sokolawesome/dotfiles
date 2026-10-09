@@ -1,8 +1,12 @@
 import importlib.machinery
 import importlib.util
+import os
 import pathlib
+import sys
 
 BIN = pathlib.Path(__file__).resolve().parents[1] / "bin"
+os.environ["COLUMNS"] = "500"
+sys.path.insert(0, str(BIN))
 
 
 def load_module(name):
