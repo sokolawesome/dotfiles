@@ -3,22 +3,10 @@
 
 import argparse
 import re
-from dataclasses import dataclass
 from pathlib import Path
 
-from rich.console import Console
-from rich.markup import escape
-from rich.panel import Panel
-from rich.prompt import Confirm
-from rich.table import Table
-
-console = Console()
-
-QUESTION = "bold cyan"
-RENAMED = "bold green"
-SKIPPED = "yellow"
-FAILED = "red"
-DIM = "dim"
+from _common import print_error, run_cli
+from _renaming import Rename, pad, rename_all
 
 VOLUME = "v"
 CHAPTER = "c"
@@ -30,49 +18,30 @@ CHAPTER_WIDTH = 3
 ARCHIVE_SUFFIXES = (".cbz", ".cbr")
 
 ALREADY_VOLUME = re.compile(r"^(\d{1,3})$")
-ALREADY_CHAPTER = re.compile(r"^c(\d{1,3})$", re.IGNORECASE)
+ALREADY_CHAPTER = re.compile(r"^c(\d{1,4})$", re.IGNORECASE)
 
 LADDER = (
-    (VOLUME, VOLUME_WIDTH, re.compile(r"\bv(?:ol(?:ume)?)?\.?\s*([0-9]+)", re.IGNORECASE)),
-    (CHAPTER, CHAPTER_WIDTH, re.compile(r"\bc(?:h(?:apter)?)?\.?\s*([0-9]+)", re.IGNORECASE)),
-    (CHAPTER, CHAPTER_WIDTH, re.compile(r"\b([0-9]{1,3})\b")),
+    (
+        VOLUME,
+        VOLUME_WIDTH,
+        re.compile(r"\bv(?:ol(?:ume)?)?\.?\s*([0-9]+)", re.IGNORECASE),
+    ),
+    (
+        CHAPTER,
+        CHAPTER_WIDTH,
+        re.compile(r"\bc(?:h(?:apter)?)?\.?\s*([0-9]+)", re.IGNORECASE),
+    ),
+    (CHAPTER, CHAPTER_WIDTH, re.compile(r"\b(?!(?:19|20)[0-9]{2}\b)([0-9]{1,4})\b")),
 )
-
-
-@dataclass(frozen=True)
-class MangaFile:
-    source: Path
-    kind: str
-    number: str
-    target: str
-
-    @property
-    def settled(self) -> bool:
-        return self.target == self.source.name
-
-    @property
-    def rank(self) -> tuple[int, int, str]:
-        return (KIND_ORDER[self.kind], int(self.number), self.source.name)
-
-    def rename(self) -> Path:
-        return self.source.with_name(self.target)
 
 
 def strip_archive_suffix(name: str) -> str:
     return re.sub(r"\.[^.]+$", "", name)
 
 
-def plural(count: int, word: str) -> str:
-    return f"{count} {word}" if count == 1 else f"{count} {word}s"
-
-
-def pad(digits: str, width: int) -> str:
-    return f"{int(digits):0{width}d}"
-
-
 def archive_suffix(name: str) -> str | None:
     for suffix in ARCHIVE_SUFFIXES:
-        if name.endswith(suffix):
+        if name.lower().endswith(suffix):
             return suffix
     return None
 
@@ -102,12 +71,15 @@ def target_name(kind: str, number: str, suffix: str) -> str:
 
 
 def scan_manga_files(directory: Path) -> list[Path]:
-    candidates = [p for p in directory.iterdir() if p.is_file()]
-    return sorted(p for p in candidates if p.name.endswith(ARCHIVE_SUFFIXES))
+    return sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and archive_suffix(path.name)
+    )
 
 
-def classify(paths: list[Path]) -> tuple[list[MangaFile], list[Path]]:
-    matched = []
+def classify(paths: list[Path]) -> tuple[list[Rename], list[Path]]:
+    ranked = []
     skipped = []
     for path in paths:
         parsed = parse_kind_and_number(path.name)
@@ -116,76 +88,10 @@ def classify(paths: list[Path]) -> tuple[list[MangaFile], list[Path]]:
             skipped.append(path)
             continue
         kind, number = parsed
-        matched.append(MangaFile(path, kind, number, target_name(kind, number, suffix)))
-    matched.sort(key=lambda entry: entry.rank)
-    return matched, skipped
-
-
-def find_collisions(entries: list[MangaFile]) -> list[tuple[str, Path, Path]]:
-    claimed: dict[str, Path] = {}
-    collisions = []
-    for entry in entries:
-        previous = claimed.setdefault(entry.target, entry.source)
-        if previous is not entry.source:
-            collisions.append((entry.target, previous, entry.source))
-    return collisions
-
-
-def build_preview(entries: list[MangaFile]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
-    table.add_column(overflow="ellipsis")
-    table.add_column(justify="center", width=1)
-    table.add_column(overflow="ellipsis")
-    for entry in entries:
-        if entry.settled:
-            table.add_row(escape(entry.source.name), "·", f"[{DIM}]unchanged[/]")
-        else:
-            table.add_row(escape(entry.source.name), "→", f"[{RENAMED}]{escape(entry.target)}[/]")
-    return table
-
-
-def build_skipped(skipped: list[Path]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
-    table.add_column(overflow="ellipsis")
-    for path in skipped:
-        table.add_row(f"[{SKIPPED}]{escape(path.name)}[/]")
-    return table
-
-
-def show_preview(entries: list[MangaFile], skipped: list[Path]) -> None:
-    console.print(Panel(build_preview(entries), title="preview", border_style="cyan", padding=(0, 1)))
-    if skipped:
-        console.print(Panel(build_skipped(skipped), title="skipped", border_style="yellow", padding=(0, 1)))
-    settled = sum(1 for entry in entries if entry.settled)
-    summary = f"{len(entries)} files"
-    if settled:
-        summary += f", {settled} already named"
-    if skipped:
-        summary += f", {len(skipped)} skipped"
-    console.print(f"[{QUESTION}]{summary}[/]\n")
-
-
-def show_collisions(collisions: list[tuple[str, Path, Path]]) -> None:
-    console.print("\n[red]error:[/] two files resolve to the same name")
-    for target, first, second in collisions:
-        console.print(f"  [red]{escape(target)}[/] from [dim]{escape(first.name)}[/] and [dim]{escape(second.name)}[/]")
-
-
-def apply_renames(entries: list[MangaFile]) -> int:
-    failures = 0
-    for entry in entries:
-        if entry.settled:
-            continue
-        try:
-            entry.source.rename(entry.rename())
-        except OSError as error:
-            console.print(f"  [{FAILED}]x[/] {escape(entry.source.name)}: {escape(str(error))}")
-            failures += 1
-        else:
-            console.print(f"  [{RENAMED}]+[/] {escape(entry.source.name)} [dim]->[/] {escape(entry.target)}")
-    return failures
-def confirm(question: str) -> bool:
-    return Confirm.ask(f"[{QUESTION}]{question}[/]", default=False, console=console)
+        rank = (KIND_ORDER[kind], int(number), path.name)
+        ranked.append((rank, Rename(path, target_name(kind, number, suffix))))
+    ranked.sort(key=lambda pair: pair[0])
+    return [rename for _, rename in ranked], skipped
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -194,64 +100,32 @@ def build_parser() -> argparse.ArgumentParser:
         description="rename manga files to a clean format",
         epilog="volumes become 01.cbz, chapters become c001.cbz; pass a directory to scan it, defaults to the current one",
     )
-    parser.add_argument("directory", nargs="?", type=Path, default=Path("."), help="directory to scan")
+    parser.add_argument(
+        "directory", nargs="?", type=Path, default=Path("."), help="directory to scan"
+    )
     return parser
 
 
-def report(done: str) -> None:
-    console.print(f"\n[{RENAMED}]{done}[/]")
-
-
 def main(argv: list[str] | None = None) -> int:
-    try:
-        return run(argv)
-    except (KeyboardInterrupt, EOFError):
-        console.print("\n[yellow]cancelled[/]")
-        return 130
-
-
-def run(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     directory = args.directory
 
     if not directory.is_dir():
-        console.print(f"[red]error:[/] {escape(str(directory))} is not a directory")
+        print_error(f"{directory} is not a directory")
         return 1
 
     paths = scan_manga_files(directory)
     if not paths:
-        console.print(f"[red]error:[/] no manga files found in {escape(str(directory))}")
+        print_error(f"no manga files found in {directory}")
         return 1
 
     entries, skipped = classify(paths)
     if not entries:
-        console.print("[red]error:[/] could not extract numbers from any files")
+        print_error("could not extract numbers from any files")
         return 1
 
-    pending = [entry for entry in entries if not entry.settled]
-    if not pending:
-        console.print(f"[{RENAMED}]nothing to rename[/], {plural(len(entries), 'file')} already named")
-        return 0
-
-    show_preview(entries, skipped)
-
-    collisions = find_collisions(entries)
-    if collisions:
-        show_collisions(collisions)
-        return 1
-
-    if not confirm("proceed?"):
-        console.print("[yellow]cancelled[/]")
-        return 1
-
-    failures = apply_renames(pending)
-
-    if failures == 0:
-        report(f"done - {plural(len(pending), 'file')} renamed")
-    else:
-        report(f"done with {failures} error(s)")
-    return 0
+    return rename_all(directory, entries, skipped)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    run_cli(main)
