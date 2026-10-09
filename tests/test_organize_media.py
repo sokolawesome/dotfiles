@@ -1,585 +1,314 @@
-import types
+import io
 
 import pytest
 from conftest import load_module
 
 organize_media = load_module("organize_media")
 
+SHREK = "Shrek (2001) [tvdbid-12345]"
+BLUE_BOX = "Blue Box (2024) [tvdbid-429934]"
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (0, "00"),
-        (1, "01"),
-        (5, "05"),
-        (7, "07"),
-        (12, "12"),
-        (99, "99"),
-        (100, "100"),
-    ],
-)
-def test_pad_season(value, expected):
-    assert organize_media.pad_season(value) == expected
+
+def answer(monkeypatch, *lines):
+    monkeypatch.setattr("sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines)))
+
+
+def tree(root):
+    return sorted(str(path.relative_to(root)) for path in root.rglob("*"))
 
 
 @pytest.mark.parametrize(
     ("spec", "expected"),
     [
         ("5", ["05"]),
-        ("1", ["01"]),
         ("0", ["00"]),
-        ("12", ["12"]),
         ("007", ["07"]),
-        ("0-3", ["00", "01", "02", "03"]),
+        ("12", ["12"]),
         ("0-2", ["00", "01", "02"]),
-        ("0-0", ["00"]),
         ("10-10", ["10"]),
-        ("2-10", ["02", "03", "04", "05", "06", "07", "08", "09", "10"]),
+        ("9-11", ["09", "10", "11"]),
     ],
 )
-def test_parse_season_range(spec, expected):
+def test_season_range(spec, expected):
     assert organize_media.parse_season_range(spec) == expected
 
 
-@pytest.mark.parametrize("spec", ["", "abc", "1-", "-1", "3-1", "1-2-3", "1.5", "a-b"])
-def test_parse_season_range_rejects(spec):
+@pytest.mark.parametrize("spec", ["", "abc", "1-", "-1", "3-1", "1-2-3", "1.5"])
+def test_season_range_rejects(spec):
     with pytest.raises(organize_media.OrganizeMediaError):
         organize_media.parse_season_range(spec)
 
 
-@pytest.mark.parametrize(
-    ("id_string", "content_type", "seasons", "expected"),
-    [
-        ("12345", "movie", [], ("12345", [])),
-        ("111", "show", ["01"], ("111", [])),
-        ("111", "show", ["01", "02"], ("111", [])),
-        ("111,222", "show", ["01"], ("111", ["222"])),
-    ],
-)
-def test_parse_tvdb_ids(id_string, content_type, seasons, expected):
-    assert organize_media.parse_tvdb_ids(id_string, content_type, seasons) == expected
+def test_cli_creates_a_movie(tmp_path, monkeypatch):
+    answer(monkeypatch, "y")
 
+    code = organize_media.main(["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", str(tmp_path)])
 
-@pytest.mark.parametrize(
-    ("id_string", "content_type", "seasons"),
-    [
-        ("", "movie", []),
-        ("", "show", ["01"]),
-        ("12345,67890", "movie", []),
-        ("111,222", "show", ["01", "02"]),
-        ("111,222,333", "show", ["01", "02", "03"]),
-        ("111,222,333", "show", ["01"]),
-    ],
-)
-def test_parse_tvdb_ids_rejects(id_string, content_type, seasons):
-    with pytest.raises(organize_media.OrganizeMediaError):
-        organize_media.parse_tvdb_ids(id_string, content_type, seasons)
+    assert code == 0
+    assert tree(tmp_path) == [SHREK]
 
 
-def test_parse_tvdb_ids_reports_both_counts():
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.parse_tvdb_ids("111,222,333", "show", ["01"])
+def test_cli_creates_a_show_with_an_id_per_season(tmp_path, monkeypatch):
+    answer(monkeypatch, "y")
 
-    assert "2 season ids" in str(error.value)
-    assert "1 seasons" in str(error.value)
-
-
-@pytest.mark.parametrize(
-    ("index", "season_ids", "expected"),
-    [
-        (0, ["222"], "222"),
-        (0, ["222", "333"], "222"),
-        (1, ["222", "333"], "333"),
-        (2, ["222", "333"], "111"),
-        (0, [], "111"),
-        (1, [], "111"),
-    ],
-)
-def test_season_id_for(index, season_ids, expected):
-    assert organize_media.season_id_for(index, season_ids, "111") == expected
-
-
-def test_main_directory_for(tmp_path):
-    result = organize_media.main_directory_for(tmp_path, "Shrek", "2001", "12345")
-
-    assert result == tmp_path / "Shrek (2001) [tvdbid-12345]"
-
-
-def test_season_directory_for(tmp_path):
-    result = organize_media.season_directory_for(tmp_path / "Show (2020) [tvdbid-1]", "02", "222")
-
-    assert result == tmp_path / "Show (2020) [tvdbid-1]" / "Season 02 [tvdbid-222]"
-
-
-def test_build_show_plan_for_a_movie(tmp_path):
-    plan = organize_media.build_show_plan(tmp_path, "movie", "Shrek", "2001", "12345", "")
-
-    assert plan.main_directory == tmp_path / "Shrek (2001) [tvdbid-12345]"
-    assert plan.seasons == ()
-    assert plan.directories() == [tmp_path / "Shrek (2001) [tvdbid-12345]"]
-
-
-def test_build_show_plan_for_a_show(tmp_path):
-    plan = organize_media.build_show_plan(
-        tmp_path, "show", "Blue Box", "2024", "429934,430001,430002", "1-2"
-    )
-
-    assert plan.show_id == "429934"
-    assert [s.number for s in plan.seasons] == ["01", "02"]
-    assert [s.directory.name for s in plan.seasons] == [
-        "Season 01 [tvdbid-430001]",
-        "Season 02 [tvdbid-430002]",
-    ]
-
-
-def test_build_show_plan_falls_back_to_the_show_id_for_seasons(tmp_path):
-    plan = organize_media.build_show_plan(tmp_path, "show", "Blue Box", "2024", "429934", "1-3")
-
-    assert [s.directory.name for s in plan.seasons] == [
-        "Season 01 [tvdbid-429934]",
-        "Season 02 [tvdbid-429934]",
-        "Season 03 [tvdbid-429934]",
-    ]
-
-
-def test_build_show_plan_needs_seasons_for_a_show(tmp_path):
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.build_show_plan(tmp_path, "show", "Blue Box", "2024", "429934", "")
-
-    assert "seasons are required" in str(error.value)
-
-
-@pytest.mark.parametrize(
-    ("content_type", "title", "year"),
-    [
-        ("film", "Shrek", "2001"),
-        ("movie", "", "2001"),
-        ("movie", "Shrek", ""),
-    ],
-)
-def test_build_show_plan_rejects_missing_values(tmp_path, content_type, title, year):
-    with pytest.raises(organize_media.OrganizeMediaError):
-        organize_media.build_show_plan(tmp_path, content_type, title, year, "12345", "")
-
-
-def test_pick_show_directory_matches_a_name(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    found, name, year, show_id = organize_media.pick_show_directory(tmp_path, "Blue Box")
-
-    assert found == tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert name == "Blue Box"
-    assert year == "2024"
-    assert show_id == "429934"
-
-
-def test_pick_show_directory_ignores_season_directories(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]" / "Season 01 [tvdbid-1]").mkdir(parents=True)
-
-    found, _, _, _ = organize_media.pick_show_directory(tmp_path, "Blue Box")
-
-    assert found.name == "Blue Box (2024) [tvdbid-429934]"
-
-
-def test_pick_show_directory_uses_the_directory_you_are_in(tmp_path):
-    show = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    show.mkdir()
-
-    found, _, _, _ = organize_media.pick_show_directory(show, "")
-
-    assert found == show
-
-
-def test_pick_show_directory_matches_part_of_a_name(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    found, _, _, _ = organize_media.pick_show_directory(tmp_path, "box")
-
-    assert found.name == "Blue Box (2024) [tvdbid-429934]"
-
-
-def test_pick_show_directory_reports_a_missing_show(tmp_path):
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.pick_show_directory(tmp_path, "Nothing")
-
-    assert "no show directory called 'Nothing'" in str(error.value)
-
-
-def test_pick_show_directory_prefers_an_exact_name(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-1]").mkdir()
-    (tmp_path / "Blue Box Redux (2024) [tvdbid-2]").mkdir()
-
-    found, _, _, _ = organize_media.pick_show_directory(tmp_path, "blue box")
-
-    assert found.name == "Blue Box (2024) [tvdbid-1]"
-
-
-def test_pick_show_directory_refuses_an_ambiguous_name(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-1]").mkdir()
-    (tmp_path / "Blue Box Redux (2024) [tvdbid-2]").mkdir()
-
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.pick_show_directory(tmp_path, "blue")
-
-    assert "matches 2 shows" in str(error.value)
-
-
-def test_pick_show_directory_reports_a_count_not_a_list(tmp_path):
-    for index in range(117):
-        (tmp_path / f"Show {index} (2024) [tvdbid-{index}]").mkdir()
-
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.pick_show_directory(tmp_path, "")
-
-    message = str(error.value)
-    assert "117 shows" in message
-    assert "pass -n NAME" in message
-    assert "Show 0" not in message
-
-
-def test_build_add_season_plan_needs_an_id_per_season(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.build_add_season_plan(tmp_path, "Blue Box", "3", "")
-
-    assert "every season needs its own" in str(error.value)
-
-
-def test_build_add_season_plan_finds_the_only_show(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    plan = organize_media.build_add_season_plan(tmp_path, "", "3", "430003")
-
-    assert plan.main_directory == tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert plan.seasons[0].directory.name == "Season 03 [tvdbid-430003]"
-
-
-def test_build_add_season_plan_takes_a_range(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    plan = organize_media.build_add_season_plan(tmp_path, "", "3-4", "430003,430004")
-
-    assert [s.directory.name for s in plan.seasons] == [
-        "Season 03 [tvdbid-430003]",
-        "Season 04 [tvdbid-430004]",
-    ]
-
-
-def test_build_add_season_plan_refuses_to_guess_between_shows(tmp_path):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-    (tmp_path / "Show Two (2019) [tvdbid-777]").mkdir()
-
-    with pytest.raises(organize_media.OrganizeMediaError) as error:
-        organize_media.build_add_season_plan(tmp_path, "", "1", "1")
-
-    assert "2 shows" in str(error.value)
-
-
-def test_create_directories_makes_the_tree(tmp_path, capsys):
-    plan = organize_media.build_show_plan(tmp_path, "show", "Blue Box", "2024", "429934", "1-2")
-
-    organize_media.create_directories(plan)
-
-    main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert main_dir.is_dir()
-    assert (main_dir / "Season 01 [tvdbid-429934]").is_dir()
-    assert (main_dir / "Season 02 [tvdbid-429934]").is_dir()
-
-
-def test_create_directories_is_repeatable(tmp_path, capsys):
-    plan = organize_media.build_show_plan(tmp_path, "movie", "Shrek", "2001", "12345", "")
-
-    organize_media.create_directories(plan)
-    organize_media.create_directories(plan)
-
-    assert "exists" in capsys.readouterr().out
-
-
-def test_main_creates_a_movie(tmp_path, monkeypatch):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: True)
     code = organize_media.main(
-        ["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", str(tmp_path)]
+        ["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", "429934,430001,430002", "-s", "1-2", str(tmp_path)]
     )
 
     assert code == 0
-    assert (tmp_path / "Shrek (2001) [tvdbid-12345]").is_dir()
+    assert tree(tmp_path) == [
+        BLUE_BOX,
+        f"{BLUE_BOX}/Season 01 [tvdbid-430001]",
+        f"{BLUE_BOX}/Season 02 [tvdbid-430002]",
+    ]
 
 
-def test_main_creates_a_show_with_seasons(tmp_path, monkeypatch):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: True)
-    code = organize_media.main(
-        [
-            "-t", "show", "-n", "Blue Box", "-y", "2024",
-            "-i", "429934,430001,430002", "-s", "1-2",
-            str(tmp_path),
-        ]
-    )
+def test_cli_creates_season_zero_for_specials(tmp_path, monkeypatch):
+    answer(monkeypatch, "y")
 
-    assert code == 0
-    main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert (main_dir / "Season 01 [tvdbid-430001]").is_dir()
-    assert (main_dir / "Season 02 [tvdbid-430002]").is_dir()
+    organize_media.main(["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", "429934,430000", "-s", "0", str(tmp_path)])
+
+    assert f"{BLUE_BOX}/Season 00 [tvdbid-430000]" in tree(tmp_path)
 
 
-def test_main_leaves_nothing_behind_when_seasons_are_missing(tmp_path, capsys):
-    code = organize_media.main(
-        ["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", "429934", str(tmp_path)]
-    )
-
-    assert code == 1
-    assert "seasons are required" in capsys.readouterr().out
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_main_reports_a_bad_id_count(tmp_path, capsys):
-    code = organize_media.main(
-        [
-            "-t", "show", "-n", "Blue Box", "-y", "2024",
-            "-i", "429934,430001", "-s", "1-3",
-            str(tmp_path),
-        ]
-    )
+@pytest.mark.parametrize(
+    ("ids", "seasons", "message"),
+    [
+        ("429934", "1-2", "0 season ids given but 2 seasons requested"),
+        ("429934,430001", "1-2", "1 season ids given but 2 seasons requested"),
+        ("429934,430001,430002,430003", "1-2", "3 season ids given but 2 seasons requested"),
+        ("", "1", "tvdb id is empty"),
+    ],
+)
+def test_cli_needs_exactly_one_id_per_season(tmp_path, capsys, ids, seasons, message):
+    code = organize_media.main(["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", ids, "-s", seasons, str(tmp_path)])
 
     assert code == 1
-    assert "season ids" in capsys.readouterr().out
-    assert list(tmp_path.iterdir()) == []
+    assert message in capsys.readouterr().out
+    assert tree(tmp_path) == []
 
 
-def test_main_reports_a_bad_season_range(tmp_path, capsys):
-    code = organize_media.main(
-        ["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", "1", "-s", "3-1", str(tmp_path)]
-    )
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "1,2"], "a movie takes one tvdb id"),
+        (["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", "1"], "seasons are required"),
+        (["-t", "show", "-n", "Blue Box", "-y", "2024", "-i", "1,2", "-s", "3-1"], "start must be <= end"),
+        (["-n", "Shrek", "-y", "2001", "-i", "1"], "type must be one of"),
+        (["-t", "movie", "-y", "2001", "-i", "1"], "name is required"),
+        (["-t", "movie", "-n", "Shrek", "-i", "1"], "year is required"),
+    ],
+)
+def test_cli_rejects_incomplete_input(tmp_path, capsys, arguments, message):
+    code = organize_media.main([*arguments, str(tmp_path)])
 
     assert code == 1
-    assert "start must be <= end" in capsys.readouterr().out
-    assert list(tmp_path.iterdir()) == []
+    assert message in capsys.readouterr().out
+    assert tree(tmp_path) == []
 
 
-def test_main_declining_creates_nothing(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: False)
+def test_declining_creates_nothing(tmp_path, monkeypatch, capsys):
+    answer(monkeypatch, "n")
 
-    code = organize_media.main(
-        ["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", str(tmp_path)]
-    )
+    code = organize_media.main(["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", str(tmp_path)])
 
     assert code == 1
     assert "cancelled" in capsys.readouterr().out
-    assert list(tmp_path.iterdir()) == []
+    assert tree(tmp_path) == []
 
 
-def test_main_add_season(tmp_path, monkeypatch):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: True)
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
+def test_existing_directories_are_kept(tmp_path, monkeypatch, capsys):
+    (tmp_path / SHREK).mkdir()
+    (tmp_path / SHREK / "Shrek.mkv").write_text("movie")
+    answer(monkeypatch, "y")
+
+    code = organize_media.main(["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "12345", str(tmp_path)])
+
+    assert code == 0
+    assert "exists" in capsys.readouterr().out
+    assert (tmp_path / SHREK / "Shrek.mkv").read_text() == "movie"
+
+
+def test_missing_root_is_reported(tmp_path, capsys):
+    code = organize_media.main(["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "1", str(tmp_path / "nope")])
+
+    assert code == 1
+    assert "is not a directory" in capsys.readouterr().out
+
+
+def test_errors_show_bracketed_paths_without_backslashes(tmp_path, capsys):
+    show = tmp_path / BLUE_BOX
+    show.mkdir()
+
+    organize_media.main(["--add-season", "-n", "Nothing", "-s", "1", "-i", "1", str(show)])
+
+    out = capsys.readouterr().out.replace("\n", "")
+    assert "[tvdbid-429934]" in out
+    assert "\\[" not in out
+
+
+def test_add_season_inside_a_show(tmp_path, monkeypatch):
+    show = tmp_path / BLUE_BOX
+    show.mkdir()
+    answer(monkeypatch, "y")
+
+    code = organize_media.main(["--add-season", "-s", "3-4", "-i", "430003,430004", str(show)])
+
+    assert code == 0
+    assert tree(tmp_path) == [
+        BLUE_BOX,
+        f"{BLUE_BOX}/Season 03 [tvdbid-430003]",
+        f"{BLUE_BOX}/Season 04 [tvdbid-430004]",
+    ]
+
+
+def test_add_season_finds_the_only_show_in_a_library(tmp_path, monkeypatch):
+    (tmp_path / BLUE_BOX).mkdir()
+    (tmp_path / "notes").mkdir()
+    answer(monkeypatch, "y")
 
     code = organize_media.main(["--add-season", "-s", "3", "-i", "430003", str(tmp_path)])
 
     assert code == 0
-    assert (tmp_path / "Blue Box (2024) [tvdbid-429934]" / "Season 03 [tvdbid-430003]").is_dir()
+    assert (tmp_path / BLUE_BOX / "Season 03 [tvdbid-430003]").is_dir()
 
 
-def test_main_add_season_takes_a_range(tmp_path, monkeypatch):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: True)
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    code = organize_media.main(["--add-season", "-s", "3-4", "-i", "430003,430004", str(tmp_path)])
-
-    main = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert code == 0
-    assert (main / "Season 03 [tvdbid-430003]").is_dir()
-    assert (main / "Season 04 [tvdbid-430004]").is_dir()
-
-
-def test_main_add_season_finds_the_only_show(tmp_path, monkeypatch):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: True)
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    code = organize_media.main(["--add-season", "-s", "1", "-i", "430001", str(tmp_path)])
-
-    assert code == 0
-    assert (tmp_path / "Blue Box (2024) [tvdbid-429934]" / "Season 01 [tvdbid-430001]").is_dir()
-
-
-def test_main_add_season_reports_a_count_when_several_show(tmp_path, capsys):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
+@pytest.mark.parametrize("name", ["blue box", "box"])
+def test_add_season_picks_a_show_by_name(tmp_path, monkeypatch, name):
+    (tmp_path / BLUE_BOX).mkdir()
     (tmp_path / "Show Two (2019) [tvdbid-777]").mkdir()
+    answer(monkeypatch, "y")
 
-    code = organize_media.main(["--add-season", "-s", "1", "-i", "1", str(tmp_path)])
+    code = organize_media.main(["--add-season", "-n", name, "-s", "3", "-i", "430003", str(tmp_path)])
 
-    out = capsys.readouterr().out
-    assert code == 1
-    assert "2 shows" in out
-    assert "-n" in out
-
-
-def test_main_add_season_reports_a_missing_show(tmp_path, capsys):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    code = organize_media.main(["--add-season", "-n", "Nothing", "-s", "1", "-i", "1", str(tmp_path)])
-
-    assert code == 1
-    assert "no show directory called" in capsys.readouterr().out
+    assert code == 0
+    assert (tmp_path / BLUE_BOX / "Season 03 [tvdbid-430003]").is_dir()
 
 
-def test_main_add_season_needs_an_id_per_season(tmp_path, capsys):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
+def test_add_season_prefers_an_exact_name(tmp_path, monkeypatch):
+    (tmp_path / "Blue (2020) [tvdbid-1]").mkdir()
+    (tmp_path / BLUE_BOX).mkdir()
+    answer(monkeypatch, "y")
 
-    code = organize_media.main(["--add-season", "-s", "1-2", "-i", "430001", str(tmp_path)])
+    organize_media.main(["--add-season", "-n", "blue", "-s", "1", "-i", "2", str(tmp_path)])
 
-    assert code == 1
-    assert "every season needs its own" in capsys.readouterr().out
-
-
-def test_main_add_season_needs_seasons_and_id(tmp_path, capsys):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-
-    code = organize_media.main(["--add-season", "-s", "1", str(tmp_path)])
-
-    assert code == 1
-    assert "needs -s/--seasons and -i/--id" in capsys.readouterr().out
+    assert (tmp_path / "Blue (2020) [tvdbid-1]" / "Season 01 [tvdbid-2]").is_dir()
 
 
-def test_main_rejects_a_missing_root(tmp_path, capsys):
-    code = organize_media.main(
-        ["-t", "movie", "-n", "Shrek", "-y", "2001", "-i", "1", str(tmp_path / "nope")]
-    )
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (["-n", "show"], "matches 2 shows"),
+        ([], "2 shows in"),
+        (["-n", "nothing"], "no show directory called 'nothing'"),
+    ],
+)
+def test_add_season_refuses_to_guess(tmp_path, capsys, arguments, message):
+    (tmp_path / "Show One (2020) [tvdbid-1]").mkdir()
+    (tmp_path / "Show Two (2019) [tvdbid-2]").mkdir()
+
+    code = organize_media.main(["--add-season", *arguments, "-s", "1", "-i", "5", str(tmp_path)])
 
     assert code == 1
-    assert "not a directory" in capsys.readouterr().out
+    assert message in capsys.readouterr().out
+    assert tree(tmp_path) == ["Show One (2020) [tvdbid-1]", "Show Two (2019) [tvdbid-2]"]
 
 
-def answers(monkeypatch, values, confirmations=()):
-    replies = iter(values)
-    monkeypatch.setattr(organize_media, "ask", lambda prompt, default="": next(replies) or default)
-    if confirmations:
-        decide = iter(confirmations)
-        monkeypatch.setattr(organize_media, "asks_yes", lambda question: next(decide))
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (["-s", "1-2", "-i", "430001"], "every season needs its own tvdb id"),
+        (["-s", "1"], "--add-season needs -s/--seasons and -i/--id"),
+        (["-i", "1"], "--add-season needs -s/--seasons and -i/--id"),
+    ],
+)
+def test_add_season_needs_seasons_and_their_ids(tmp_path, capsys, arguments, message):
+    show = tmp_path / BLUE_BOX
+    show.mkdir()
+
+    code = organize_media.main(["--add-season", *arguments, str(show)])
+
+    assert code == 1
+    assert message in capsys.readouterr().out
+    assert tree(tmp_path) == [BLUE_BOX]
 
 
-def test_guided_mode_asks_each_value(tmp_path, monkeypatch):
-    answers(monkeypatch, ["movie", "Shrek", "2001", "12345"], [True])
+def test_guided_movie(tmp_path, monkeypatch):
+    answer(monkeypatch, "1", "Shrek", "2001", "12345", "y")
 
     code = organize_media.main([str(tmp_path)])
 
     assert code == 0
-    assert (tmp_path / "Shrek (2001) [tvdbid-12345]").is_dir()
+    assert tree(tmp_path) == [SHREK]
 
 
-def test_guided_mode_walks_the_seasons(tmp_path, monkeypatch):
-    answers(monkeypatch, ["show", "Blue Box", "2024", "429934", "1-2", "430001", "430002", "n"], [True])
-
-    code = organize_media.main([str(tmp_path)])
-
-    main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert code == 0
-    assert (main_dir / "Season 01 [tvdbid-430001]").is_dir()
-    assert (main_dir / "Season 02 [tvdbid-430002]").is_dir()
-
-
-def test_guided_mode_defaults_a_season_id_to_the_show_id(tmp_path, monkeypatch):
-    answers(monkeypatch, ["show", "Blue Box", "2024", "429934", "1-2", "", "", "n"], [True])
-
-    code = organize_media.main([str(tmp_path)])
-
-    main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    assert code == 0
-    assert (main_dir / "Season 01 [tvdbid-429934]").is_dir()
-    assert (main_dir / "Season 02 [tvdbid-429934]").is_dir()
-
-
-def test_output_keeps_the_tvdb_tags(tmp_path, monkeypatch, capsys):
-    answers(monkeypatch, ["show", "space-bunny", "1998", "135234", "1-2", "5453", "45233", "n"], [True])
+def test_guided_mode_defaults_to_a_movie(tmp_path, monkeypatch):
+    answer(monkeypatch, "", "Shrek", "2001", "12345", "y")
 
     organize_media.main([str(tmp_path)])
 
-    out = capsys.readouterr().out
-    assert "space-bunny (1998) [tvdbid-135234]" in out
-    assert "Season 01 [tvdbid-5453]" in out
-    assert "Season 02 [tvdbid-45233]" in out
+    assert tree(tmp_path) == [SHREK]
 
 
-def test_guided_mode_season_prompt_has_no_default(tmp_path, monkeypatch):
-    shown = []
+def test_guided_show_asks_an_id_for_each_season(tmp_path, monkeypatch):
+    answer(monkeypatch, "show", "Blue Box", "2024", "429934", "1-2", "430001", "430002", "y")
 
-    def record(prompt, default=""):
-        shown.append((prompt, default))
-        if prompt.startswith("what"):
-            return "2"
-        if prompt.startswith("seasons"):
-            return "1-2"
-        return "x"
+    code = organize_media.main([str(tmp_path)])
 
-    monkeypatch.setattr(organize_media, "ask", record)
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: False)
-
-    organize_media.main([str(tmp_path)])
-
-    season_prompts = [(p, d) for p, d in shown if p.startswith("tvdb id for season")]
-    assert season_prompts == [("tvdb id for season 01", ""), ("tvdb id for season 02", "")]
-
-
-def test_season_ids_fall_back_to_the_series_id_when_none_are_given(tmp_path, monkeypatch):
-    monkeypatch.setattr(organize_media, "asks_yes", lambda question: True)
-
-    code = organize_media.main(
-        ["-t", "show", "-n", "foo", "-y", "2020", "-i", "33", "-s", "1-2", str(tmp_path)]
-    )
-
-    main_dir = tmp_path / "foo (2020) [tvdbid-33]"
     assert code == 0
-    assert (main_dir / "Season 01 [tvdbid-33]").is_dir()
-    assert (main_dir / "Season 02 [tvdbid-33]").is_dir()
+    assert tree(tmp_path) == [
+        BLUE_BOX,
+        f"{BLUE_BOX}/Season 01 [tvdbid-430001]",
+        f"{BLUE_BOX}/Season 02 [tvdbid-430002]",
+    ]
 
 
-def test_ask_rejects_an_empty_answer(monkeypatch, capsys):
-    replies = iter(["", "   ", "Shrek"])
+def test_guided_mode_asks_again_for_an_empty_answer(tmp_path, monkeypatch, capsys):
+    answer(monkeypatch, "2", "", "Blue Box", "2024", "429934", "1", "", "430001", "y")
 
-    monkeypatch.setattr(organize_media, "Prompt", types.SimpleNamespace(ask=lambda *a, **k: next(replies)))
+    code = organize_media.main([str(tmp_path)])
 
-    assert organize_media.ask("title") == "Shrek"
+    assert code == 0
     assert capsys.readouterr().out.count("an answer is required") == 2
+    assert (tmp_path / BLUE_BOX / "Season 01 [tvdbid-430001]").is_dir()
 
 
-def test_ask_uses_a_default_when_given(monkeypatch):
-    seen = {}
-
-    def fake_ask(prompt, **kwargs):
-        seen.update(kwargs)
-        return ""
-
-    monkeypatch.setattr(organize_media, "Prompt", types.SimpleNamespace(ask=fake_ask))
-
-    organize_media.ask("add another season?", "n")
-
-    assert seen["default"] == "n"
-
-
-def test_guided_mode_creates_every_season_at_once(tmp_path, monkeypatch):
-    answers(monkeypatch, ["show", "Blue Box", "2024", "429934", "1-2", "430001", "430002"], [True])
+def test_guided_mode_asks_again_for_an_unknown_type(tmp_path, monkeypatch, capsys):
+    answer(monkeypatch, "film", "m", "Shrek", "2001", "12345", "y")
 
     code = organize_media.main([str(tmp_path)])
 
-    main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
     assert code == 0
-    assert (main_dir / "Season 01 [tvdbid-430001]").is_dir()
-    assert (main_dir / "Season 02 [tvdbid-430002]").is_dir()
+    assert "pick movie, show or add season" in capsys.readouterr().out
+    assert tree(tmp_path) == [SHREK]
 
 
-def test_guided_mode_offers_add_season(tmp_path, monkeypatch):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
-    answers(monkeypatch, ["3", "3", "430003"], [True])
+def test_guided_mode_declined_creates_nothing(tmp_path, monkeypatch):
+    answer(monkeypatch, "1", "Shrek", "2001", "12345", "n")
 
     code = organize_media.main([str(tmp_path)])
 
-    main_dir = tmp_path / "Blue Box (2024) [tvdbid-429934]"
+    assert code == 1
+    assert tree(tmp_path) == []
+
+
+def test_guided_add_season_inside_a_show(tmp_path, monkeypatch, capsys):
+    show = tmp_path / BLUE_BOX
+    show.mkdir()
+    answer(monkeypatch, "3", "3", "430003", "y")
+
+    code = organize_media.main([str(show)])
+
     assert code == 0
-    assert (main_dir / "Season 03 [tvdbid-430003]").is_dir()
+    assert "inside" in capsys.readouterr().out
+    assert (show / "Season 03 [tvdbid-430003]").is_dir()
 
 
-def test_guided_mode_add_season_asks_for_a_name_between_shows(tmp_path, monkeypatch):
-    (tmp_path / "Blue Box (2024) [tvdbid-429934]").mkdir()
+@pytest.mark.parametrize("choice", ["2", "two"])
+def test_guided_add_season_picks_a_show_by_number_or_name(tmp_path, monkeypatch, choice):
+    (tmp_path / BLUE_BOX).mkdir()
     (tmp_path / "Show Two (2019) [tvdbid-777]").mkdir()
-    answers(monkeypatch, ["3", "Show Two", "1", "778001"], [True])
+    answer(monkeypatch, "3", choice, "1", "778001", "y")
 
     code = organize_media.main([str(tmp_path)])
 
@@ -587,69 +316,17 @@ def test_guided_mode_add_season_asks_for_a_name_between_shows(tmp_path, monkeypa
     assert (tmp_path / "Show Two (2019) [tvdbid-777]" / "Season 01 [tvdbid-778001]").is_dir()
 
 
-def test_guided_mode_stops_when_declined(tmp_path, monkeypatch):
-    answers(monkeypatch, ["movie", "Shrek", "2001", "12345"], [False])
+def test_guided_add_season_asks_again_for_a_bad_pick(tmp_path, monkeypatch, capsys):
+    for index in range(12):
+        (tmp_path / f"Show {index:02d} (2024) [tvdbid-{index}]").mkdir()
+    answer(monkeypatch, "3", "11", "show", "nothing", "Show 11", "1", "500", "y")
 
     code = organize_media.main([str(tmp_path)])
 
-    assert code == 1
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_guided_mode_asks_again_for_a_bad_mode(tmp_path, monkeypatch, capsys):
-    answers(monkeypatch, ["film", "1", "Shrek", "2001", "12345"], [True])
-
-    code = organize_media.main([str(tmp_path)])
-
-    assert code == 0
-    assert "pick movie, show or add season" in capsys.readouterr().out
-    assert (tmp_path / "Shrek (2001) [tvdbid-12345]").is_dir()
-
-
-def test_guided_mode_defaults_the_type_to_movie(tmp_path, monkeypatch):
-    answers(monkeypatch, ["", "Shrek", "2001", "12345"], [True])
-
-    code = organize_media.main([str(tmp_path)])
-
-    assert code == 0
-    assert (tmp_path / "Shrek (2001) [tvdbid-12345]").is_dir()
-
-
-def test_ask_show_uses_the_directory_you_are_in(tmp_path, monkeypatch, capsys):
-    show = tmp_path / "Blue Box (2024) [tvdbid-429934]"
-    show.mkdir()
-    monkeypatch.setattr(organize_media, "ask", lambda prompt, default="": "")
-
-    assert organize_media.ask_show(show) == ""
-    assert "inside" in capsys.readouterr().out
-
-
-def test_ask_show_offers_a_menu_when_there_are_many(tmp_path, monkeypatch, capsys):
-    for index in range(117):
-        (tmp_path / f"Show {index} (2024) [tvdbid-{index}]").mkdir()
-    monkeypatch.setattr(organize_media, "ask", lambda prompt, default="": "7")
-
-    seventh = organize_media.find_show_directories(tmp_path)[6][1]
-
-    assert organize_media.ask_show(tmp_path) == seventh
     out = capsys.readouterr().out
-    assert "117 shows" in out
-    assert "and 107 more" in out
-
-
-def test_ask_show_takes_a_name(tmp_path, monkeypatch):
-    (tmp_path / "Blue Box (2024) [tvdbid-1]").mkdir()
-    (tmp_path / "Show Two (2019) [tvdbid-2]").mkdir()
-    monkeypatch.setattr(organize_media, "ask", lambda prompt, default="": "two")
-
-    assert organize_media.ask_show(tmp_path) == "Show Two"
-
-
-def test_ask_show_rejects_a_number_outside_the_menu(tmp_path, monkeypatch, capsys):
-    for index in range(117):
-        (tmp_path / f"Show {index} (2024) [tvdbid-{index}]").mkdir()
-    replies = iter(["999", "Show 3"])
-    monkeypatch.setattr(organize_media, "ask", lambda prompt, default="": next(replies))
-
-    assert organize_media.ask_show(tmp_path) == "Show 3"
-    assert "pick a number between 1 and 10" in capsys.readouterr().out
+    assert code == 0
+    assert "and 2 more" in out
+    assert "pick a number between 1 and 10" in out
+    assert "matches 12 shows" in out
+    assert "no show by that name" in out
+    assert (tmp_path / "Show 11 (2024) [tvdbid-11]" / "Season 01 [tvdbid-500]").is_dir()
