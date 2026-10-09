@@ -1,20 +1,29 @@
 """Console helpers shared by the scripts in this directory."""
 
+import shutil
+import subprocess
 from collections.abc import Callable
 
 from rich.console import Console, RenderableType
 from rich.markup import escape
 from rich.panel import Panel
-from rich.prompt import Confirm
 from rich.table import Table
+from rich.theme import Theme
 
-console = Console()
+THEME = Theme(
+    {
+        "question": "bold cyan",
+        "success": "bold green",
+        "warning": "yellow",
+        "failure": "red",
+        "changed": "bold yellow",
+        "added": "green",
+        "removed": "red",
+        "name": "bold cyan",
+    }
+)
 
-QUESTION = "bold cyan"
-SUCCESS = "bold green"
-WARNING = "yellow"
-FAILURE = "red"
-DIM = "dim"
+console = Console(theme=THEME)
 
 INTERRUPTED = 130
 
@@ -28,19 +37,20 @@ def show_panel(content: RenderableType, title: str, border: str = "cyan") -> Non
 
 
 def print_error(message: str) -> None:
-    console.print(f"[{FAILURE}]error:[/] {escape(message)}")
+    console.print(f"[failure]error:[/] {escape(message)}")
 
 
 def print_cancelled() -> None:
-    console.print(f"[{WARNING}]cancelled[/]")
-
-
-def confirm(question: str) -> bool:
-    return Confirm.ask(f"[{QUESTION}]{question}[/]", default=False, console=console)
+    console.print("[warning]cancelled[/]")
 
 
 def plural(count: int, word: str) -> str:
     return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
+def notify(title: str, body: str) -> None:
+    if shutil.which("notify-send"):
+        subprocess.run(["notify-send", title, body], check=False)
 
 
 def run_cli(main: Callable[[], int]) -> None:

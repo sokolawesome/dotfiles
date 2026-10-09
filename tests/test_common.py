@@ -1,5 +1,6 @@
-import _common
 import pytest
+
+import _common
 
 
 def test_plural_switches_on_count():

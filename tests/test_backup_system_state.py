@@ -2,6 +2,7 @@ import pathlib
 import subprocess
 
 import pytest
+
 from conftest import load_module
 
 backup_system_state = load_module("backup_system_state")
@@ -66,18 +67,6 @@ def test_backup_counts_added_and_removed_packages(tmp_path, monkeypatch, capsys)
 
     assert "1 added, 1 removed" in capsys.readouterr().out
     assert (other / "pacman-packages.txt").read_text() == "base\nzsh\n"
-
-
-def test_diff_reports_without_writing(tmp_path, monkeypatch, capsys):
-    fake_system(monkeypatch)
-
-    code = backup_system_state.main(["--diff", "--dotfiles", str(tmp_path)])
-
-    out = capsys.readouterr().out
-    assert code == 0
-    assert "would change" in out
-    assert "2 added, 0 removed" in out
-    assert list(tmp_path.iterdir()) == []
 
 
 def test_a_failing_command_leaves_every_file_alone(tmp_path, monkeypatch, capsys):
@@ -153,3 +142,26 @@ def test_run_text_explains_a_real_failure(script, reason):
         backup_system_state.run_text(["sh", "-c", script])
 
     assert reason in str(error.value)
+
+
+def test_changes_list_the_added_and_removed_names(tmp_path, monkeypatch, capsys):
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "pacman-packages.txt").write_text("base\nvim\n")
+    fake_system(monkeypatch)
+
+    backup_system_state.main(["--dotfiles", str(tmp_path)])
+
+    rows = [" ".join(line.strip("│ ").split()) for line in capsys.readouterr().out.splitlines()]
+    assert "pacman packages + zsh" in rows
+    assert "- vim" in rows
+
+
+def test_a_new_file_is_not_listed_name_by_name(tmp_path, monkeypatch, capsys):
+    fake_system(monkeypatch)
+
+    backup_system_state.main(["--dotfiles", str(tmp_path)])
+
+    out = capsys.readouterr().out
+    assert "changes" not in out
+    assert "+ zsh" not in out

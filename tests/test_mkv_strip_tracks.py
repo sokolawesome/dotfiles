@@ -4,6 +4,7 @@ import shutil
 import subprocess
 
 import pytest
+
 from conftest import load_module
 
 mkv = load_module("mkv_strip_tracks")
@@ -12,6 +13,13 @@ needs_tools = pytest.mark.skipif(
     shutil.which("mkvmerge") is None or shutil.which("ffmpeg") is None,
     reason="mkvmerge and ffmpeg are needed to build real mkv files",
 )
+
+
+@pytest.fixture(autouse=True)
+def notifications(monkeypatch):
+    sent = []
+    monkeypatch.setattr(mkv, "notify", lambda title, body: sent.append(body))
+    return sent
 
 
 def answer(monkeypatch, *lines):
@@ -303,3 +311,37 @@ def test_a_missing_directory_is_an_error(tmp_path, capsys):
 
     assert code == 1
     assert "not a directory" in capsys.readouterr().out
+
+
+@needs_tools
+def test_the_result_lists_every_file_with_a_total(tmp_path, monkeypatch, capsys, notifications):
+    make_mkv(tmp_path / "a.mkv", audio=["eng", "jpn"], subtitles=[])
+    make_mkv(tmp_path / "b.mkv", audio=["eng", "jpn"], subtitles=[])
+    answer(monkeypatch, "1", "y")
+
+    mkv.main([str(tmp_path)])
+
+    first_cells = [line.strip("│ ").split(" ")[0] for line in capsys.readouterr().out.splitlines()]
+    assert {"a.mkv", "b.mkv", "total"} <= set(first_cells)
+    assert len(notifications) == 1
+    assert notifications[0].startswith("done - 2 files stripped, saved ")
+
+
+def test_sizes_format_in_binary_units():
+    assert mkv.format_size(512) == "512 B"
+    assert mkv.format_size(3 * 1024**2) == "3.00 MiB"
+    assert mkv.format_size(-2 * 1024**3) == "-2.00 GiB"
+
+
+def test_the_result_table_marks_a_failed_file(capsys):
+    results = [
+        mkv.StripResult(mkv.Path("a.mkv"), 3 * 1024**2, 1024**2),
+        mkv.StripResult(mkv.Path("b.mkv"), 1024**2, 1024**2, "disk full"),
+    ]
+
+    mkv.console.print(mkv.build_result_table(results))
+
+    rows = [" ".join(line.split()) for line in capsys.readouterr().out.splitlines()]
+    assert "a.mkv 3.00 MiB 1.00 MiB 2.00 MiB" in rows
+    assert "b.mkv 1.00 MiB failed" in rows
+    assert "total 4.00 MiB 2.00 MiB 2.00 MiB" in rows

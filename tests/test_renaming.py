@@ -1,7 +1,8 @@
 import io
 
-import _renaming
 import pytest
+
+import _renaming
 from _renaming import Rename
 
 
@@ -98,7 +99,7 @@ def test_rename_all_stops_early_when_everything_is_named(tmp_path, capsys):
     out = capsys.readouterr().out
     assert code == 0
     assert "nothing to rename, 2 files already named" in out
-    assert "proceed?" not in out
+    assert "?" not in out
 
 
 def test_rename_all_refuses_two_files_with_one_target(tmp_path, capsys):
@@ -155,3 +156,29 @@ def test_apply_never_overwrites_a_file_that_appeared_after_the_check(tmp_path):
 
     assert failures == 1
     assert files(tmp_path) == {"b.mkv": "b", "taken.mkv": "keep"}
+
+
+def test_unticked_renames_stay_put_on_a_terminal(tmp_path, monkeypatch):
+    make(tmp_path, **{"a.mkv": "a", "b.mkv": "b"})
+    pending = renames(tmp_path, ("a.mkv", "S01E01.mkv"), ("b.mkv", "S01E02.mkv"))
+    monkeypatch.setattr(_renaming, "interactive", lambda: True)
+    monkeypatch.setattr(_renaming, "choose_many", lambda *args, **kwargs: [pending[1]])
+    answer(monkeypatch, "y")
+
+    code = _renaming.rename_all(tmp_path, pending, [])
+
+    assert code == 0
+    assert files(tmp_path) == {"a.mkv": "a", "S01E02.mkv": "b"}
+
+
+def test_unticking_a_file_keeps_its_name_taken(tmp_path, monkeypatch, capsys):
+    make(tmp_path, **{"S01E02.mkv": "a", "b.mkv": "b"})
+    pending = renames(tmp_path, ("S01E02.mkv", "S01E01.mkv"), ("b.mkv", "S01E02.mkv"))
+    monkeypatch.setattr(_renaming, "interactive", lambda: True)
+    monkeypatch.setattr(_renaming, "choose_many", lambda *args, **kwargs: [pending[1]])
+
+    code = _renaming.rename_all(tmp_path, pending, [])
+
+    assert code == 1
+    assert "two files resolve to the same name" in capsys.readouterr().out
+    assert files(tmp_path) == {"S01E02.mkv": "a", "b.mkv": "b"}

@@ -3,13 +3,10 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from rich.markup import escape
+from rich.table import Table
+
 from _common import (
-    DIM,
-    FAILURE,
-    QUESTION,
-    SUCCESS,
-    WARNING,
-    confirm,
     console,
     plain_table,
     plural,
@@ -17,8 +14,7 @@ from _common import (
     print_error,
     show_panel,
 )
-from rich.markup import escape
-from rich.table import Table
+from _prompts import Option, choose_many, confirm, interactive
 
 
 @dataclass(frozen=True)
@@ -33,6 +29,9 @@ class Rename:
     @property
     def target_path(self) -> Path:
         return self.source.with_name(self.target)
+
+    def left_alone(self) -> "Rename":
+        return Rename(self.source, self.source.name)
 
 
 def pad(digits: str | int, width: int) -> str:
@@ -74,12 +73,12 @@ def build_preview(renames: list[Rename]) -> Table:
     table.add_column(overflow="ellipsis")
     for rename in renames:
         if rename.settled:
-            table.add_row(escape(rename.source.name), "·", f"[{DIM}]unchanged[/]")
+            table.add_row(escape(rename.source.name), "·", "[dim]unchanged[/]")
         else:
             table.add_row(
                 escape(rename.source.name),
                 "→",
-                f"[{SUCCESS}]{escape(rename.target)}[/]",
+                f"[success]{escape(rename.target)}[/]",
             )
     return table
 
@@ -88,28 +87,32 @@ def build_skipped(skipped: list[Path]) -> Table:
     table = plain_table()
     table.add_column(overflow="ellipsis")
     for path in skipped:
-        table.add_row(f"[{WARNING}]{escape(path.name)}[/]")
+        table.add_row(f"[warning]{escape(path.name)}[/]")
     return table
+
+
+def show_skipped(skipped: list[Path]) -> None:
+    if skipped:
+        show_panel(build_skipped(skipped), "skipped", "warning")
 
 
 def show_preview(renames: list[Rename], skipped: list[Path]) -> None:
     show_panel(build_preview(renames), "preview")
-    if skipped:
-        show_panel(build_skipped(skipped), "skipped", WARNING)
+    show_skipped(skipped)
     settled = sum(1 for rename in renames if rename.settled)
     summary = f"{len(renames)} files"
     if settled:
         summary += f", {settled} already named"
     if skipped:
         summary += f", {len(skipped)} skipped"
-    console.print(f"[{QUESTION}]{summary}[/]\n")
+    console.print(f"[question]{summary}[/]\n")
 
 
 def show_collisions(collisions: list[tuple[str, Path, Path]]) -> None:
     print_error("two files resolve to the same name")
     for target, first, second in collisions:
         console.print(
-            f"  [{FAILURE}]{escape(target)}[/] from [dim]{escape(first.name)}[/] and [dim]{escape(second.name)}[/]"
+            f"  [failure]{escape(target)}[/] from [dim]{escape(first.name)}[/] and [dim]{escape(second.name)}[/]"
         )
 
 
@@ -117,7 +120,7 @@ def show_blocked(blocked: list[Rename]) -> None:
     print_error("these names are taken by files that would not move")
     for rename in blocked:
         console.print(
-            f"  [{FAILURE}]{escape(rename.target)}[/] wanted by [dim]{escape(rename.source.name)}[/]"
+            f"  [failure]{escape(rename.target)}[/] wanted by [dim]{escape(rename.source.name)}[/]"
         )
 
 
@@ -130,25 +133,44 @@ def apply_renames(renames: list[Rename]) -> int:
             rename.source.rename(rename.target_path)
         except OSError as error:
             console.print(
-                f"  [{FAILURE}]x[/] {escape(rename.source.name)}: {escape(str(error))}"
+                f"  [failure]x[/] {escape(rename.source.name)}: {escape(str(error))}"
             )
             failures += 1
         else:
             console.print(
-                f"  [{SUCCESS}]+[/] {escape(rename.source.name)} [dim]->[/] {escape(rename.target)}"
+                f"  [success]+[/] {escape(rename.source.name)} [dim]->[/] {escape(rename.target)}"
             )
     return failures
+
+
+def pick_renames(renames: list[Rename], skipped: list[Path]) -> list[Rename]:
+    pending = [rename for rename in renames if not rename.settled]
+    show_skipped(skipped)
+    options = [
+        Option(rename, (rename.source.name, "→", rename.target)) for rename in pending
+    ]
+    chosen = choose_many(
+        f"rename {plural(len(pending), 'file')}", options, pending, required=True
+    )
+    return [
+        rename if rename.settled or rename in chosen else rename.left_alone()
+        for rename in renames
+    ]
 
 
 def rename_all(directory: Path, renames: list[Rename], skipped: list[Path]) -> int:
     pending = [rename for rename in renames if not rename.settled]
     if not pending:
         console.print(
-            f"[{SUCCESS}]nothing to rename[/], {plural(len(renames), 'file')} already named"
+            f"[success]nothing to rename[/], {plural(len(renames), 'file')} already named"
         )
         return 0
 
-    show_preview(renames, skipped)
+    if interactive():
+        renames = pick_renames(renames, skipped)
+        pending = [rename for rename in renames if not rename.settled]
+    else:
+        show_preview(renames, skipped)
 
     collisions = find_collisions(renames)
     if collisions:
@@ -162,13 +184,13 @@ def rename_all(directory: Path, renames: list[Rename], skipped: list[Path]) -> i
         show_blocked(blocked)
         return 1
 
-    if not confirm("proceed?"):
+    if not confirm(f"rename {plural(len(ordered), 'file')}?"):
         print_cancelled()
         return 1
 
     failures = apply_renames(ordered)
     if failures:
-        console.print(f"\n[{FAILURE}]done with {plural(failures, 'error')}[/]")
+        console.print(f"\n[failure]done with {plural(failures, 'error')}[/]")
         return 1
-    console.print(f"\n[{SUCCESS}]done - {plural(len(ordered), 'file')} renamed[/]")
+    console.print(f"\n[success]done - {plural(len(ordered), 'file')} renamed[/]")
     return 0

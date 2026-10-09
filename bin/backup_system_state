@@ -8,21 +8,17 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from rich.markup import escape
+from rich.table import Table
+from rich_argparse import RichHelpFormatter
+
 from _common import (
-    DIM,
-    FAILURE,
-    QUESTION,
-    SUCCESS,
     console,
     plain_table,
     print_error,
     run_cli,
     show_panel,
 )
-from rich.markup import escape
-from rich.table import Table
-
-CHANGED = "bold yellow"
 
 
 class Outcome(Enum):
@@ -46,8 +42,8 @@ class Artifact:
 @dataclass(frozen=True)
 class Result:
     outcome: Outcome
-    added: int = 0
-    removed: int = 0
+    added: tuple[str, ...] = ()
+    removed: tuple[str, ...] = ()
     reason: str = ""
 
 
@@ -99,7 +95,7 @@ def collect(target: Path) -> list[Artifact]:
     other = target / "other"
     return [
         Artifact(
-            "official pacman packages",
+            "pacman packages",
             other / "pacman-packages.txt",
             as_lines(installed_packages(foreign=False)),
         ),
@@ -117,10 +113,10 @@ def collect(target: Path) -> list[Artifact]:
     ]
 
 
-def count_changes(new: str, old: str) -> tuple[int, int]:
+def changed_lines(new: str, old: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
     before = set(old.splitlines())
     after = set(new.splitlines())
-    return len(after - before), len(before - after)
+    return tuple(sorted(after - before)), tuple(sorted(before - after))
 
 
 def write_atomically(path: Path, content: str) -> None:
@@ -130,7 +126,7 @@ def write_atomically(path: Path, content: str) -> None:
     os.replace(temporary, path)
 
 
-def apply(artifact: Artifact, dry_run: bool) -> Result:
+def apply(artifact: Artifact) -> Result:
     if artifact.target.is_file():
         current = artifact.target.read_text()
         if current == artifact.content:
@@ -140,12 +136,11 @@ def apply(artifact: Artifact, dry_run: bool) -> Result:
         current = ""
         outcome = Outcome.CREATED
 
-    added, removed = count_changes(artifact.content, current)
-    if not dry_run:
-        try:
-            write_atomically(artifact.target, artifact.content)
-        except OSError as error:
-            return Result(Outcome.FAILED, added, removed, str(error))
+    added, removed = changed_lines(artifact.content, current)
+    try:
+        write_atomically(artifact.target, artifact.content)
+    except OSError as error:
+        return Result(Outcome.FAILED, added, removed, str(error))
     return Result(outcome, added, removed)
 
 
@@ -154,7 +149,7 @@ def describe(result: Result) -> str:
         return ""
     if result.outcome is Outcome.FAILED:
         return result.reason
-    return f"{result.added} added, {result.removed} removed"
+    return f"{len(result.added)} added, {len(result.removed)} removed"
 
 
 def build_table(rows: list[tuple[Artifact, Result]]) -> Table:
@@ -163,18 +158,36 @@ def build_table(rows: list[tuple[Artifact, Result]]) -> Table:
     table.add_column(justify="right", width=9)
     table.add_column(overflow="fold")
     styles = {
-        Outcome.CREATED: SUCCESS,
-        Outcome.UPDATED: CHANGED,
-        Outcome.UNCHANGED: DIM,
-        Outcome.FAILED: FAILURE,
+        Outcome.CREATED: "success",
+        Outcome.UPDATED: "changed",
+        Outcome.UNCHANGED: "dim",
+        Outcome.FAILED: "failure",
     }
     for artifact, result in rows:
         table.add_row(
             escape(artifact.label),
             f"[{styles[result.outcome]}]{result.outcome.value}[/]",
-            f"[{DIM}]{escape(describe(result))}[/]",
+            f"[dim]{escape(describe(result))}[/]",
         )
     return table
+
+
+def build_changes(rows: list[tuple[Artifact, Result]]) -> Table:
+    table = plain_table()
+    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="fold")
+    for artifact, result in rows:
+        lines = [f"[added]+ {escape(line)}[/]" for line in result.added if line]
+        lines += [f"[removed]- {escape(line)}[/]" for line in result.removed if line]
+        for index, line in enumerate(lines):
+            table.add_row(escape(artifact.label) if index == 0 else "", line)
+    return table
+
+
+def show_changes(rows: list[tuple[Artifact, Result]]) -> None:
+    updated = [(artifact, result) for artifact, result in rows if result.outcome is Outcome.UPDATED]
+    if updated:
+        show_panel(build_changes(updated), "changes", "changed")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -185,44 +198,37 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        artifacts = collect(args.dotfiles)
+        with console.status("reading system state"):
+            artifacts = collect(args.dotfiles)
     except BackupError as error:
         print_error(str(error))
         return 1
 
-    rows = [(artifact, apply(artifact, args.diff)) for artifact in artifacts]
+    rows = [(artifact, apply(artifact)) for artifact in artifacts]
     failures = sum(1 for _, result in rows if result.outcome is Outcome.FAILED)
 
-    if args.diff:
-        show_panel(build_table(rows), "would change", QUESTION)
-        return 1 if failures else 0
-
     show_panel(build_table(rows), "backup")
+    show_changes(rows)
 
     if failures:
-        console.print(f"\n[{FAILURE}]{failures} file(s) could not be written[/]")
+        console.print(f"\n[failure]{failures} file(s) could not be written[/]")
         return 1
 
     written = sum(
         1 for _, result in rows if result.outcome in (Outcome.CREATED, Outcome.UPDATED)
     )
     if written:
-        console.print(f"\n[{SUCCESS}]{written} file(s) written[/]")
+        console.print(f"\n[success]{written} file(s) written[/]")
     else:
-        console.print(f"\n[{DIM}]no changes[/]")
+        console.print("\n[dim]no changes[/]")
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="backup_system_state",
+        formatter_class=RichHelpFormatter,
         description="save installed packages, user groups and enabled services into the dotfiles repo",
-    )
-    parser.add_argument(
-        "-d",
-        "--diff",
-        action="store_true",
-        help="report what would change without writing",
     )
     parser.add_argument(
         "--dotfiles",

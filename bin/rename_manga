@@ -5,6 +5,8 @@ import argparse
 import re
 from pathlib import Path
 
+from rich_argparse import RichHelpFormatter
+
 from _common import print_error, run_cli
 from _renaming import Rename, pad, rename_all
 
@@ -97,6 +99,7 @@ def classify(paths: list[Path]) -> tuple[list[Rename], list[Path]]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rename_manga",
+        formatter_class=RichHelpFormatter,
         description="rename manga files to a clean format",
         epilog="volumes become 01.cbz, chapters become c001.cbz; pass a directory to scan it, defaults to the current one",
     )
@@ -116,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
 
     paths = scan_manga_files(directory)
     if not paths:
-        print_error(f"no manga files found in {directory}")
+        print_error("no manga files found")
         return 1
 
     entries, skipped = classify(paths)

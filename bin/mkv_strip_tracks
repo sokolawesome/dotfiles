@@ -11,23 +11,22 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from rich.markup import escape
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+from rich.table import Table
+from rich_argparse import RichHelpFormatter
+
 from _common import (
-    DIM,
-    FAILURE,
-    QUESTION,
-    SUCCESS,
-    confirm,
     console,
+    notify,
     plain_table,
+    plural,
     print_cancelled,
     print_error,
     run_cli,
     show_panel,
 )
-from rich.markup import escape
-from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
-from rich.prompt import Prompt
-from rich.table import Table
+from _prompts import Option, choose_many, confirm
 
 MKV_SUFFIX = ".mkv"
 TEMP_SUFFIX = ".stripping"
@@ -54,6 +53,18 @@ SUPPORTED_SUBTITLE_LANGUAGES = (
 
 class StripError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class StripResult:
+    path: Path
+    before: int
+    after: int
+    error: str = ""
+
+    @property
+    def saved(self) -> int:
+        return self.before - self.after
 
 
 @dataclass(frozen=True)
@@ -222,43 +233,22 @@ def labels_for(selection: Selection, scans: list[FileScan]) -> list[str]:
     return labels
 
 
-def ask_picks[T](items: list[T], shortcuts: dict[str, list[T]]) -> list[T]:
-    words = ", ".join(f"'{word}'" for word in shortcuts if word)
-    while True:
-        answer = (
-            Prompt.ask(f"[{QUESTION}]keep which[/] [dim](numbers, {words})[/]")
-            .strip()
-            .lower()
-        )
-        if answer in shortcuts:
-            return shortcuts[answer]
-        parts = answer.replace(",", " ").split()
-        if all(part.isdigit() and 1 <= int(part) <= len(items) for part in parts):
-            return [items[int(part) - 1] for part in parts]
-        console.print(
-            f"[{FAILURE}]pick numbers between 1 and {len(items)}, or {words}[/]"
-        )
-
-
 def choose_interactively(
     scans: list[FileScan], union: list[Selection]
 ) -> list[Selection]:
-    table = plain_table()
-    table.add_column(justify="right", width=4)
-    table.add_column(width=10)
-    table.add_column(width=10)
-    table.add_column(overflow="ellipsis")
-    table.add_column(justify="right", width=8)
-    for number, selection in enumerate(union, start=1):
-        table.add_row(
-            str(number),
-            f"[{SUCCESS}]{escape(selection.kind)}[/]",
-            escape(selection.language),
-            escape(", ".join(labels_for(selection, scans)) or "unnamed"),
-            f"[{DIM}]{presence_of(selection, scans)} files[/]",
+    options = [
+        Option(
+            selection,
+            (
+                selection.kind,
+                selection.language,
+                ", ".join(labels_for(selection, scans)) or "unnamed",
+            ),
+            plural(presence_of(selection, scans), "file"),
         )
-    show_panel(table, "tracks across all files")
-    return ask_picks(union, {"all": list(union), "none": [], "": []})
+        for selection in union
+    ]
+    return choose_many("keep which tracks", options)
 
 
 def resolve_picks(
@@ -289,44 +279,28 @@ def resolve_picks(
 def pick_from_candidates(
     selection: Selection, scan: FileScan, candidates: list[Track]
 ) -> list[Track]:
-    table = plain_table()
-    table.add_column(justify="right", width=4)
-    table.add_column(overflow="ellipsis")
-    table.add_column(overflow="ellipsis")
-    for number, track in enumerate(candidates, start=1):
-        table.add_row(
-            str(number), escape(track.label), f"[{DIM}]{escape(track.codec)}[/]"
-        )
-    show_panel(
-        table,
+    options = [Option(track, (track.label,), track.codec) for track in candidates]
+    return choose_many(
         f"{scan.path.name}: {len(candidates)} {selection.kind} tracks in {selection.language}",
-        FAILURE,
+        options,
+        candidates,
+        required=True,
+        border="failure",
     )
-    return ask_picks(candidates, {"all": list(candidates), "": list(candidates)})
 
 
 def pick_from_available(selection: Selection, scan: FileScan) -> list[Track]:
     available = [track for track in scan.tracks if track.kind == selection.kind]
     if not available:
         return []
-    table = plain_table()
-    table.add_column(justify="right", width=4)
-    table.add_column(width=10)
-    table.add_column(overflow="ellipsis")
-    table.add_column(overflow="ellipsis")
-    for number, track in enumerate(available, start=1):
-        table.add_row(
-            str(number),
-            escape(track.language),
-            escape(track.label),
-            f"[{DIM}]{escape(track.codec)}[/]",
-        )
-    show_panel(
-        table,
+    options = [
+        Option(track, (track.language, track.label), track.codec) for track in available
+    ]
+    return choose_many(
         f"{scan.path.name}: no {selection.language} {selection.kind}, pick a replacement",
-        FAILURE,
+        options,
+        border="failure",
     )
-    return ask_picks(available, {"none": [], "": []})
 
 
 def build_plan(
@@ -411,17 +385,16 @@ def strip_one(plan: FilePlan, mkvmerge: str, report: Callable[[int], object] | N
     return True, ""
 
 
-def size_of(paths: list[Path]) -> int:
-    total = 0
-    for path in paths:
-        try:
-            total += path.stat().st_size
-        except OSError:
-            continue
-    return total
+def size_of(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
 
 
 def format_size(value: int) -> str:
+    if value < 0:
+        return f"-{format_size(-value)}"
     if value >= GIBIBYTE:
         return f"{value / GIBIBYTE:.2f} GiB"
     if value >= MEBIBYTE:
@@ -460,11 +433,11 @@ def build_plan_table(plans: list[FilePlan]) -> Table:
         audio = track_summary([track for track in first.keep if track.kind == AUDIO])
         subs = track_summary([track for track in first.keep if track.kind == SUBTITLES])
         if first.kinds and not first.changes_file:
-            note = f"[{DIM}]nothing to strip[/]"
+            note = "[dim]nothing to strip[/]"
         elif first.missing:
-            note = f"[{DIM}]missing:[/] [dim]{escape(describe_missing(first))}[/]"
+            note = f"[dim]missing: {escape(describe_missing(first))}[/]"
         else:
-            note = f"[{DIM}]clean[/]"
+            note = "[dim]clean[/]"
         table.add_row(
             escape(heading), f"audio {escape(audio)}", f"subs {escape(subs)}", note
         )
@@ -477,20 +450,20 @@ def build_problem_table(scans: list[FileScan]) -> Table:
     table.add_column(overflow="fold")
     for scan in scans:
         if scan.error:
-            table.add_row(escape(scan.path.name), f"[{FAILURE}]{escape(scan.error)}[/]")
+            table.add_row(escape(scan.path.name), f"[failure]{escape(scan.error)}[/]")
     return table
 
 
 def report_unreadable(scans: list[FileScan]) -> None:
     if any(not scan.readable for scan in scans):
-        show_panel(build_problem_table(scans), "unreadable", FAILURE)
+        show_panel(build_problem_table(scans), "unreadable", "failure")
 
 
-def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
-    failures = 0
+def strip_all(plans: list[FilePlan], mkvmerge: str) -> list[StripResult]:
+    results = []
     with Progress(
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(complete_style=SUCCESS, style=DIM, finished_style=SUCCESS),
+        BarColumn(complete_style="success", style="dim", finished_style="success"),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
         console=console,
@@ -505,6 +478,7 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
             if overall is not None:
                 progress.update(overall, description=f"{index - 1}/{len(plans)}")
             task = progress.add_task(escape(plan.path.name), total=100)
+            before = size_of(plan.path)
             ok, detail = strip_one(
                 plan,
                 mkvmerge,
@@ -512,18 +486,59 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> int:
             )
             progress.remove_task(task)
             if not ok:
-                failures += 1
                 console.print(
-                    f"[{FAILURE}]x[/] {escape(plan.path.name)}: {escape(detail)}"
+                    f"[failure]x[/] {escape(plan.path.name)}: {escape(detail)}"
                 )
+            results.append(
+                StripResult(plan.path, before, size_of(plan.path) if ok else before, detail)
+            )
             if overall is not None:
                 progress.advance(overall)
-    return failures
+    return results
+
+
+def build_result_table(results: list[StripResult]) -> Table:
+    table = Table(box=None, pad_edge=False, show_edge=False, header_style="dim")
+    table.add_column("file", overflow="ellipsis", ratio=1)
+    table.add_column("before", justify="right")
+    table.add_column("after", justify="right")
+    table.add_column("saved", justify="right", style="success")
+    for result in results:
+        if result.error:
+            table.add_row(
+                escape(result.path.name), format_size(result.before), "[failure]failed[/]", ""
+            )
+        else:
+            table.add_row(
+                escape(result.path.name),
+                format_size(result.before),
+                format_size(result.after),
+                format_size(result.saved),
+            )
+    if len(results) > 1:
+        table.add_section()
+        table.add_row(
+            "[bold]total[/]",
+            format_size(sum(result.before for result in results)),
+            format_size(sum(result.after for result in results)),
+            format_size(sum(result.saved for result in results)),
+        )
+    return table
+
+
+def probe_all(paths: list[Path], mkvmerge: str) -> list[FileScan]:
+    scans = []
+    with console.status("probing") as status:
+        for index, path in enumerate(paths, start=1):
+            status.update(f"probing {index}/{len(paths)} [dim]{escape(path.name)}[/]")
+            scans.append(probe(path, mkvmerge))
+    return scans
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mkv_strip_tracks",
+        formatter_class=RichHelpFormatter,
         description="strip audio and subtitle tracks from mkv files, matching by language",
         epilog="pass a directory to scan it, defaults to the current one",
     )
@@ -544,10 +559,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if not paths:
-        print_error(f"no .mkv files in {args.directory}")
+        print_error("no .mkv files found")
         return 1
 
-    scans = [probe(path, mkvmerge) for path in paths]
+    scans = probe_all(paths, mkvmerge)
     report_unreadable(scans)
     readable = [scan for scan in scans if scan.readable]
     if not readable:
@@ -560,7 +575,7 @@ def main(argv: list[str] | None = None) -> int:
 
     selections = choose_interactively(readable, union)
     if not selections:
-        console.print("[yellow]nothing selected[/]")
+        console.print("[warning]nothing selected[/]")
         return 0
 
     plans = build_plan(readable, selections, True)
@@ -569,7 +584,7 @@ def main(argv: list[str] | None = None) -> int:
     changing = [plan for plan in plans if plan.changes_file]
     if not changing:
         console.print(
-            f"[{SUCCESS}]nothing to strip[/], every file already has only the picked tracks"
+            "[success]nothing to strip[/], every file already has only the picked tracks"
         )
         return 0
 
@@ -577,18 +592,18 @@ def main(argv: list[str] | None = None) -> int:
         print_cancelled()
         return 1
 
-    before = size_of([plan.path for plan in changing])
-    failures = strip_all(changing, mkvmerge)
-    after = size_of([plan.path for plan in changing])
+    results = strip_all(changing, mkvmerge)
+    failures = sum(1 for result in results if result.error)
+    saved = format_size(sum(result.saved for result in results))
 
-    console.print()
+    show_panel(build_result_table(results), "result")
     if failures:
-        console.print(f"[{FAILURE}]done with {failures} error(s)[/]")
+        summary = f"done with {plural(failures, 'error')}"
+        console.print(f"[failure]{summary}[/]")
     else:
-        console.print(f"[{SUCCESS}]done - {len(changing)} files stripped[/]")
-    console.print(f"[{QUESTION}]before:[/] {format_size(before)}")
-    console.print(f"[{QUESTION}]after:  [/] {format_size(after)}")
-    console.print(f"[{QUESTION}]saved:  [/] {format_size(before - after)}")
+        summary = f"done - {len(changing)} files stripped"
+        console.print(f"[success]{summary}[/], saved {saved}")
+    notify("mkv_strip_tracks", f"{summary}, saved {saved}")
     return 1 if failures else 0
 
 

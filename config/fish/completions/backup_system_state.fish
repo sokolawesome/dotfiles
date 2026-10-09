@@ -5,10 +5,6 @@ complete -c backup_system_state \
     -d "show this help message"
 
 complete -c backup_system_state \
-    -s d -l diff \
-    -d "report what would change without writing"
-
-complete -c backup_system_state \
     -l dotfiles \
     -r -F -a "(__fish_complete_directories)" \
     -d "dotfiles repo root"

@@ -1,6 +1,7 @@
 import io
 
 import pytest
+
 from conftest import load_module
 
 rename_episodes = load_module("rename_episodes")

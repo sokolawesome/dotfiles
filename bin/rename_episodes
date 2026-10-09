@@ -6,7 +6,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from _common import QUESTION, console, print_error, run_cli
+from rich_argparse import RichHelpFormatter
+
+from _common import console, print_error, run_cli
 from _renaming import Rename, pad, rename_all
 
 SEASON_WIDTH = 2
@@ -202,6 +204,7 @@ def classify(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rename_episodes",
+        formatter_class=RichHelpFormatter,
         description="rename episode files to S01E01 format",
         epilog="pass a directory to scan it, defaults to the current one",
     )
@@ -238,11 +241,11 @@ def main(argv: list[str] | None = None) -> int:
         console.print("[dim]       use -s/--season to specify[/]")
         return 1
     if args.season is None:
-        console.print(f"[{QUESTION}]detected season {season}[/] from directory name\n")
+        console.print(f"[question]detected season {season}[/] from directory name\n")
 
     paths = scan_media_files(directory)
     if not paths:
-        print_error(f"no media files found in {directory}")
+        print_error("no media files found")
         return 1
 
     episodes, skipped = classify(paths, season, args.offset)

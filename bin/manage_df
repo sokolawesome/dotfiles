@@ -8,20 +8,18 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from rich.markup import escape
+from rich.table import Table
+from rich_argparse import RichHelpFormatter
+
 from _common import (
-    FAILURE,
-    SUCCESS,
-    WARNING,
     console,
     plain_table,
     print_error,
     run_cli,
     show_panel,
 )
-from rich.markup import escape
-from rich.table import Table
-
-PACKAGE = "bold cyan"
+from _prompts import Option, choose_many
 
 PACKAGES = {
     "home": Path.home(),
@@ -86,17 +84,6 @@ def require_stow() -> None:
         raise ManageError("gnu stow not found, install with 'sudo pacman -S stow'")
 
 
-def selected_packages(requested: list[str] | None) -> list[str]:
-    if not requested:
-        return list(PACKAGES)
-    unknown = [name for name in requested if name not in PACKAGES]
-    if unknown:
-        raise ManageError(
-            f"unknown package(s): {', '.join(unknown)}. known: {', '.join(PACKAGES)}"
-        )
-    return [name for name in PACKAGES if name in requested]
-
-
 def stow_output(finished: subprocess.CompletedProcess) -> str:
     lines = f"{finished.stdout}\n{finished.stderr}".splitlines()
     return "\n".join(
@@ -132,13 +119,13 @@ def build_table(results: list[Result]) -> Table:
     table.add_column(overflow="ellipsis")
     table.add_column(overflow="fold")
     styles = {
-        "done": SUCCESS,
-        "failed": FAILURE,
-        "missing": WARNING,
+        "done": "success",
+        "failed": "failure",
+        "missing": "warning",
     }
     for result in results:
         table.add_row(
-            f"[{PACKAGE}]{result.package}[/]",
+            f"[name]{result.package}[/]",
             f"[{styles[result.outcome]}]{result.outcome}[/]",
             f"[dim]{escape(str(result.target))}[/]",
         )
@@ -151,7 +138,7 @@ def build_detail(results: list[Result]) -> Table:
     table.add_column(overflow="fold")
     for result in results:
         for line in result.detail.splitlines():
-            table.add_row(f"[{PACKAGE}]{result.package}[/]", f"[dim]{escape(line)}[/]")
+            table.add_row(f"[name]{result.package}[/]", f"[dim]{escape(line)}[/]")
     return table
 
 
@@ -161,14 +148,22 @@ def report(action: Action, results: list[Result], verbose: bool) -> int:
     succeeded = [result for result in results if result.outcome == "done"]
     if verbose:
         if any(result.detail for result in succeeded):
-            show_panel(build_detail(succeeded), "stow output", WARNING)
+            show_panel(build_detail(succeeded), "stow output", "warning")
         else:
             console.print("[dim]stow made no changes[/]")
 
     if failures:
-        show_panel(build_detail(failures), "errors", FAILURE)
+        show_panel(build_detail(failures), "errors", "failure")
         return 1
     return 0
+
+
+def pick_packages() -> list[str]:
+    packages = list(PACKAGES)
+    options = [
+        Option(package, (package,), str(PACKAGES[package])) for package in packages
+    ]
+    return choose_many("which packages", options, packages, required=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -178,7 +173,6 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         require_stow()
-        packages = selected_packages(args.package)
     except ManageError as error:
         print_error(str(error))
         return 1
@@ -188,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
         print_error(f"not a directory: {source}")
         return 1
 
+    packages = pick_packages() if args.pick else list(PACKAGES)
+
     results = [run_package(source, package, action, verbose) for package in packages]
     return report(action, results, verbose)
 
@@ -195,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="manage_df",
+        formatter_class=RichHelpFormatter,
         description="stow the dotfiles packages with gnu stow",
         epilog=f"packages: {', '.join(PACKAGES)}",
     )
@@ -216,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="remove the symlinks",
     )
     mode.add_argument(
-        "-n",
+        "-d",
         "--dry-run",
         action="store_const",
         const="dry-run",
@@ -225,11 +222,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.set_defaults(action="stow")
     parser.add_argument(
-        "-p",
-        "--package",
-        action="append",
-        metavar="NAME",
-        help="limit to one package, repeatable",
+        "-i", "--pick", action="store_true", help="pick the packages from a list"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="show stow's own output"

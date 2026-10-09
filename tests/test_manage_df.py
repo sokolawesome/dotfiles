@@ -2,6 +2,7 @@ import pathlib
 import shutil
 
 import pytest
+
 from conftest import load_module
 
 manage_df = load_module("manage_df")
@@ -46,17 +47,6 @@ def test_stow_creates_real_directories_instead_of_folding(repo):
 
 
 @needs_stow
-def test_package_flag_limits_the_run(repo):
-    source, targets = repo
-
-    code = run(source, "-p", "bin")
-
-    assert code == 0
-    assert (targets["bin"] / "tool").is_symlink()
-    assert not targets["config"].exists()
-
-
-@needs_stow
 def test_unstow_removes_the_links(repo):
     source, targets = repo
     run(source)
@@ -84,7 +74,7 @@ def test_restow_links_a_file_added_after_the_first_stow(repo):
 def test_dry_run_on_a_missing_target_creates_nothing(repo, capsys):
     source, targets = repo
 
-    code = run(source, "-n")
+    code = run(source, "-d")
 
     out = capsys.readouterr().out
     assert code == 0
@@ -97,7 +87,7 @@ def test_dry_run_on_an_existing_target_lists_each_link(repo, capsys):
     source, targets = repo
     targets["bin"].mkdir(parents=True)
 
-    code = run(source, "-n", "-p", "bin")
+    code = run(source, "-d")
 
     out = capsys.readouterr().out
     assert code == 0
@@ -119,7 +109,7 @@ def test_unstow_with_a_missing_target_creates_nothing(repo):
 def test_verbose_shows_the_links_stow_made(repo, capsys):
     source, _ = repo
 
-    run(source, "-v", "-p", "bin")
+    run(source, "-v")
 
     assert "LINK: tool" in capsys.readouterr().out
 
@@ -130,7 +120,7 @@ def test_a_conflicting_file_fails_the_package_and_stays_untouched(repo, capsys):
     targets["bin"].mkdir(parents=True)
     (targets["bin"] / "tool").write_text("mine")
 
-    code = run(source, "-p", "bin")
+    code = run(source)
 
     out = capsys.readouterr().out
     assert code == 1
@@ -149,15 +139,6 @@ def test_a_package_missing_from_the_repo_is_reported_and_skipped(repo, capsys):
     assert code == 0
     assert "missing" in capsys.readouterr().out
     assert not targets["config"].exists()
-
-
-def test_unknown_package_is_rejected(repo, capsys):
-    source, _ = repo
-
-    code = run(source, "-p", "nope")
-
-    assert code == 1
-    assert "unknown package(s): nope" in capsys.readouterr().out
 
 
 def test_missing_stow_is_reported(repo, monkeypatch, capsys):
@@ -190,3 +171,15 @@ def test_dotfiles_defaults_to_the_repo_holding_the_script(monkeypatch):
     parsed = manage_df.build_parser().parse_args([])
 
     assert parsed.dotfiles == pathlib.Path(__file__).resolve().parents[1]
+
+
+@needs_stow
+def test_pick_stows_only_the_ticked_packages(repo, monkeypatch):
+    source, targets = repo
+    monkeypatch.setattr(manage_df, "choose_many", lambda *args, **kwargs: ["config"])
+
+    code = run(source, "--pick")
+
+    assert code == 0
+    assert (targets["config"] / "app" / "settings.toml").is_symlink()
+    assert not (targets["bin"] / "tool").exists()

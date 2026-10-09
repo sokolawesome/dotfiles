@@ -13,13 +13,12 @@ complete -c manage_df \
     -d "remove the symlinks"
 
 complete -c manage_df \
-    -s n -l dry-run \
+    -s d -l dry-run \
     -d "show what would happen"
 
 complete -c manage_df \
-    -s p -l package \
-    -x -d "limit to one package, repeatable" \
-    -a "home config bin agents"
+    -s i -l pick \
+    -d "pick the packages from a list"
 
 complete -c manage_df \
     -s v -l verbose \
