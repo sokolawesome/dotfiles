@@ -6,19 +6,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from rich.console import Console
-from rich.markup import escape
-from rich.panel import Panel
-from rich.prompt import Confirm
-from rich.table import Table
-
-console = Console()
-
-QUESTION = "bold cyan"
-RENAMED = "bold green"
-SKIPPED = "yellow"
-FAILED = "red"
-DIM = "dim"
+from _common import QUESTION, console, print_error, run_cli
+from _renaming import Rename, pad, rename_all
 
 SEASON_WIDTH = 2
 EPISODE_WIDTH = 2
@@ -29,20 +18,40 @@ SUBTITLE_SUFFIXES = (".ass", ".srt", ".vtt", ".sub")
 MEDIA_SUFFIXES = VIDEO_SUFFIXES + AUDIO_SUFFIXES + SUBTITLE_SUFFIXES
 
 LANGUAGE_CODES = (
-    "en", "eng",
-    "ru", "rus",
-    "es", "spa",
-    "ja", "jpn",
+    "en",
+    "eng",
+    "ru",
+    "rus",
+    "es",
+    "spa",
+    "ja",
+    "jpn",
 )
 
 QUALITY_WORDS = (
-    "bdrip", "webrip", "web.dl", "bluray", "x264", "x265", "hevc", "avc",
-    "flac", "aac", "ac3", "eac3", "dts", "opus", "10bit", "8bit",
+    "bdrip",
+    "webrip",
+    "web.dl",
+    "bluray",
+    "x264",
+    "x265",
+    "hevc",
+    "avc",
+    "flac",
+    "aac",
+    "ac3",
+    "eac3",
+    "dts",
+    "opus",
+    "10bit",
+    "8bit",
 )
 RESOLUTION_WORDS = (r"[0-9]{3,4}p", r"[0-9]{4}x[0-9]{3,4}")
 QUALITY_ALTERNATION = "|".join(QUALITY_WORDS + RESOLUTION_WORDS)
 
-BRACKETED_TAG = re.compile(rf"\[([^\]]*(?:{QUALITY_ALTERNATION})[^\]]*)\]", re.IGNORECASE)
+BRACKETED_TAG = re.compile(
+    rf"\[([^\]]*(?:{QUALITY_ALTERNATION})[^\]]*)\]", re.IGNORECASE
+)
 PAREN_TAG = re.compile(rf"\(([^)]*(?:{QUALITY_ALTERNATION})[^)]*)\)", re.IGNORECASE)
 BARE_TAG = re.compile(rf"\b(?:{QUALITY_ALTERNATION})\b", re.IGNORECASE)
 
@@ -59,9 +68,6 @@ ALPHA_SEGMENT = re.compile(r"^[A-Za-z]+$")
 
 SEASON_IN_NAME = re.compile(r"season[\s._-]*([0-9]+)", re.IGNORECASE)
 
-ABSOLUTE_SEASON = "00"
-UNDETECTED = object()
-
 
 @dataclass(frozen=True)
 class NumberPattern:
@@ -70,23 +76,7 @@ class NumberPattern:
     pattern: re.Pattern
 
 
-@dataclass(frozen=True)
-class Episode:
-    source: Path
-    season: str
-    number: str
-    target: str
-
-    @property
-    def settled(self) -> bool:
-        return self.target == self.source.name
-
-    def rename(self) -> Path:
-        return self.source.with_name(self.target)
-
-
 LADDER = (
-    NumberPattern(1, 2, DOTTED_SEASON_EPISODE),
     NumberPattern(1, 2, JOINED_SEASON_EPISODE),
     NumberPattern(1, 2, SEASON_EPISODE_X),
     NumberPattern(None, 1, BRACKETED_NUMBER),
@@ -95,14 +85,6 @@ LADDER = (
     NumberPattern(None, 1, LEADING_NUMBER),
     NumberPattern(None, 1, MIDDLE_NUMBER),
 )
-
-
-def plural(count: int, word: str) -> str:
-    return f"{count} {word}" if count == 1 else f"{count} {word}s"
-
-
-def pad(digits: str, width: int) -> str:
-    return f"{int(digits):0{width}d}"
 
 
 def strip_extension(name: str) -> str:
@@ -132,7 +114,7 @@ def normalize_name(name: str) -> str:
     return strip_quality_tags(underscored)
 
 
-def match_number(name: str) -> tuple[str, str] | None:
+def match_number(name: str) -> tuple[str | None, str] | None:
     dotted = DOTTED_SEASON_EPISODE.search(name)
     if dotted:
         return pad(dotted.group(1), SEASON_WIDTH), pad(dotted.group(2), EPISODE_WIDTH)
@@ -141,10 +123,11 @@ def match_number(name: str) -> tuple[str, str] | None:
     for rung in LADDER:
         match = rung.pattern.search(normalized)
         if match:
-            if rung.season_group is None:
-                season = ABSOLUTE_SEASON
-            else:
-                season = pad(match.group(rung.season_group), SEASON_WIDTH)
+            season = (
+                None
+                if rung.season_group is None
+                else pad(match.group(rung.season_group), SEASON_WIDTH)
+            )
             return season, pad(match.group(rung.episode_group), EPISODE_WIDTH)
     return None
 
@@ -169,11 +152,9 @@ def trailing_tags(stem: str) -> str:
 
 def target_suffix(name: str) -> str:
     for suffix in MEDIA_SUFFIXES:
-        if name.endswith(suffix):
-            break
-    else:
-        return ""
-    return f"{trailing_tags(name[: -len(suffix)])}{suffix}"
+        if name.lower().endswith(suffix):
+            return f"{trailing_tags(name[: -len(suffix)])}{suffix}"
+    return ""
 
 
 def detect_season(directory_name: str) -> str | None:
@@ -185,30 +166,18 @@ def detect_season(directory_name: str) -> str | None:
 
 def scan_media_files(directory: Path) -> list[Path]:
     candidates = [p for p in directory.iterdir() if p.is_file()]
-    return sorted(p for p in candidates if p.name.endswith(MEDIA_SUFFIXES))
+    return sorted(p for p in candidates if p.name.lower().endswith(MEDIA_SUFFIXES))
 
 
-def resolve_season(argument: str | None, directory: Path) -> str | None:
+def resolve_season(argument: int | None, directory: Path) -> str | None:
     if argument is not None:
         return pad(argument, SEASON_WIDTH)
     return detect_season(directory.resolve().name)
 
 
-def resolve_number(number: str, offset: int) -> int:
-    return int(number) + offset
-
-
-def resolve_season_for_file(found_season: str, detected_season: str) -> str:
-    if found_season == ABSOLUTE_SEASON:
-        return detected_season
-    return found_season
-
-
 def classify(
-    paths: list[Path],
-    season: str,
-    episode_offset: int,
-) -> tuple[list[Episode], list[Path]]:
+    paths: list[Path], season: str, episode_offset: int
+) -> tuple[list[Rename], list[Path]]:
     episodes = []
     skipped = []
     for path in paths:
@@ -218,85 +187,16 @@ def classify(
             skipped.append(path)
             continue
         found_season, found_number = parsed
-        final_season = resolve_season_for_file(found_season, season)
-        number = resolve_number(found_number, episode_offset)
+        number = int(found_number) + episode_offset
         if number < 1:
             skipped.append(path)
             continue
-        target = f"S{final_season}E{pad(str(number), EPISODE_WIDTH)}{suffix}"
-        episodes.append(Episode(path, final_season, str(number), target))
+        episodes.append(
+            Rename(
+                path, f"S{found_season or season}E{pad(number, EPISODE_WIDTH)}{suffix}"
+            )
+        )
     return episodes, skipped
-
-
-def find_collisions(episodes: list[Episode]) -> list[tuple[str, Path, Path]]:
-    claimed: dict[str, Path] = {}
-    collisions = []
-    for episode in episodes:
-        previous = claimed.setdefault(episode.target, episode.source)
-        if previous is not episode.source:
-            collisions.append((episode.target, previous, episode.source))
-    return collisions
-
-
-def build_preview(episodes: list[Episode]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
-    table.add_column(overflow="ellipsis")
-    table.add_column(justify="center", width=1)
-    table.add_column(overflow="ellipsis")
-    for episode in episodes:
-        if episode.settled:
-            table.add_row(escape(episode.source.name), "·", f"[{DIM}]unchanged[/]")
-        else:
-            table.add_row(escape(episode.source.name), "→", f"[{RENAMED}]{escape(episode.target)}[/]")
-    return table
-
-
-def build_skipped(skipped: list[Path]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
-    table.add_column(overflow="ellipsis")
-    for path in skipped:
-        table.add_row(f"[{SKIPPED}]{escape(path.name)}[/]")
-    return table
-
-
-def show_preview(episodes: list[Episode], skipped: list[Path]) -> None:
-    console.print(Panel(build_preview(episodes), title="preview", border_style="cyan", padding=(0, 1)))
-    if skipped:
-        console.print(Panel(build_skipped(skipped), title="skipped", border_style="yellow", padding=(0, 1)))
-    settled = sum(1 for episode in episodes if episode.settled)
-    summary = f"{len(episodes)} files"
-    if settled:
-        summary += f", {settled} already named"
-    if skipped:
-        summary += f", {len(skipped)} skipped"
-    console.print(f"[{QUESTION}]{summary}[/]\n")
-
-
-def show_collisions(collisions: list[tuple[str, Path, Path]]) -> None:
-    console.print("\n[red]error:[/] two files resolve to the same name")
-    for target, first, second in collisions:
-        console.print(f"  [red]{escape(target)}[/] from [dim]{escape(first.name)}[/] and [dim]{escape(second.name)}[/]")
-
-
-def apply_renames(episodes: list[Episode]) -> int:
-    failures = 0
-    for episode in episodes:
-        try:
-            episode.source.rename(episode.rename())
-        except OSError as error:
-            console.print(f"  [{FAILED}]x[/] {escape(episode.source.name)}: {escape(str(error))}")
-            failures += 1
-        else:
-            console.print(f"  [{RENAMED}]+[/] {escape(episode.source.name)} [dim]->[/] {escape(episode.target)}")
-    return failures
-
-
-def report(done: str) -> None:
-    console.print(f"\n[{RENAMED}]{done}[/]")
-
-
-def confirm(question: str) -> bool:
-    return Confirm.ask(f"[{QUESTION}]{question}[/]", default=False, console=console)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -305,31 +205,36 @@ def build_parser() -> argparse.ArgumentParser:
         description="rename episode files to S01E01 format",
         epilog="pass a directory to scan it, defaults to the current one",
     )
-    parser.add_argument("directory", nargs="?", type=Path, default=Path("."), help="directory to scan")
-    parser.add_argument("-s", "--season", type=int, help="season number, detected from the directory name if absent")
-    parser.add_argument("-o", "--offset", type=int, default=0, help="add this to every episode number, negative to subtract")
+    parser.add_argument(
+        "directory", nargs="?", type=Path, default=Path("."), help="directory to scan"
+    )
+    parser.add_argument(
+        "-s",
+        "--season",
+        type=int,
+        help="season number, detected from the directory name if absent",
+    )
+    parser.add_argument(
+        "-o",
+        "--offset",
+        type=int,
+        default=0,
+        help="add this to every episode number, negative to subtract",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    try:
-        return run(argv)
-    except (KeyboardInterrupt, EOFError):
-        console.print("\n[yellow]cancelled[/]")
-        return 130
-
-
-def run(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     directory = args.directory
 
     if not directory.is_dir():
-        console.print(f"[red]error:[/] {escape(str(directory))} is not a directory")
+        print_error(f"{directory} is not a directory")
         return 1
 
-    season = resolve_season(None if args.season is None else str(args.season), directory)
+    season = resolve_season(args.season, directory)
     if season is None:
-        console.print("[red]error:[/] could not detect season from the directory name")
+        print_error("could not detect season from the directory name")
         console.print("[dim]       use -s/--season to specify[/]")
         return 1
     if args.season is None:
@@ -337,39 +242,16 @@ def run(argv: list[str] | None = None) -> int:
 
     paths = scan_media_files(directory)
     if not paths:
-        console.print(f"[red]error:[/] no media files found in {escape(str(directory))}")
+        print_error(f"no media files found in {directory}")
         return 1
 
     episodes, skipped = classify(paths, season, args.offset)
-
     if not episodes:
-        console.print("[red]error:[/] could not extract episode numbers from any files")
+        print_error("could not extract episode numbers from any files")
         return 1
 
-    pending = [episode for episode in episodes if not episode.settled]
-    if not pending:
-        console.print(f"[{RENAMED}]nothing to rename[/], {plural(len(episodes), 'file')} already named")
-        return 0
-
-    show_preview(episodes, skipped)
-
-    collisions = find_collisions(episodes)
-    if collisions:
-        show_collisions(collisions)
-        return 1
-
-    if not confirm("proceed?"):
-        console.print("[yellow]cancelled[/]")
-        return 1
-
-    failures = apply_renames(pending)
-
-    if failures == 0:
-        report(f"done - {plural(len(pending), 'file')} renamed")
-    else:
-        report(f"done with {failures} error(s)")
-    return 0
+    return rename_all(directory, episodes, skipped)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    run_cli(main)
