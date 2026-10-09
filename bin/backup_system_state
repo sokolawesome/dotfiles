@@ -8,18 +8,21 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from rich.console import Console
+from _common import (
+    DIM,
+    FAILURE,
+    QUESTION,
+    SUCCESS,
+    console,
+    plain_table,
+    print_error,
+    run_cli,
+    show_panel,
+)
 from rich.markup import escape
-from rich.panel import Panel
 from rich.table import Table
 
-console = Console()
-
-QUESTION = "bold cyan"
-CREATED = "bold green"
 CHANGED = "bold yellow"
-UNCHANGED = "dim"
-FAILED = "red"
 
 
 class Outcome(Enum):
@@ -45,9 +48,11 @@ class Result:
     outcome: Outcome
     added: int = 0
     removed: int = 0
+    reason: str = ""
 
 
-def run_text(command: list[str], label: str) -> str:
+def run_text(command: list[str]) -> str:
+    label = " ".join(command)
     try:
         finished = subprocess.run(command, capture_output=True, text=True, check=False)
     except FileNotFoundError as error:
@@ -60,27 +65,12 @@ def run_text(command: list[str], label: str) -> str:
 
 
 def installed_packages(foreign: bool) -> list[str]:
-    label = "pacman -Qem" if foreign else "pacman -Qe"
-    output = run_text(["pacman", "-Qem" if foreign else "-Qe"], label)
-    return sorted(line.split()[0] for line in output.splitlines() if line.strip())
-
-
-def repo_packages(all_names: list[str], aur_names: list[str]) -> list[str]:
-    aur = set(aur_names)
-    kept = [name for name in all_names if name not in aur]
-    return sorted(dict.fromkeys(kept))
+    origin = "-Qqem" if foreign else "-Qqen"
+    return sorted(run_text(["pacman", origin]).split())
 
 
 def user_groups() -> list[str]:
-    output = run_text(["groups"], "groups")
-    return sorted(line for line in output.split())
-
-
-def enabled_services() -> list[str]:
-    system = unit_files(system_scope=True)
-    user = unit_files(system_scope=False)
-    lines = ["# system services", *system, "", "# user services", *user]
-    return lines
+    return sorted(run_text(["groups"]).split())
 
 
 def unit_files(system_scope: bool) -> list[str]:
@@ -88,36 +78,53 @@ def unit_files(system_scope: bool) -> list[str]:
     if not system_scope:
         command.append("--user")
     command += ["list-unit-files", "--state=enabled", "--no-pager", "--no-legend"]
-    try:
-        finished = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError as error:
-        raise BackupError(f"systemctl: {error}") from error
-    if finished.returncode != 0:
-        return []
-    return [line.split()[0] for line in finished.stdout.splitlines() if line.strip()]
+    return [line.split()[0] for line in run_text(command).splitlines() if line.strip()]
+
+
+def enabled_services() -> list[str]:
+    return [
+        "# system services",
+        *unit_files(system_scope=True),
+        "",
+        "# user services",
+        *unit_files(system_scope=False),
+    ]
+
+
+def as_lines(items: list[str]) -> str:
+    return "".join(f"{item}\n" for item in items)
 
 
 def collect(target: Path) -> list[Artifact]:
     other = target / "other"
-    other.mkdir(parents=True, exist_ok=True)
-    all_names = installed_packages(foreign=False)
-    aur_names = installed_packages(foreign=True)
-    services = enabled_services()
     return [
-        Artifact("official pacman packages", other / "pacman-packages.txt", "".join(f"{n}\n" for n in repo_packages(all_names, aur_names))),
-        Artifact("aur packages", other / "yay-packages.txt", "".join(f"{n}\n" for n in aur_names)),
-        Artifact("user groups", other / "user-groups.txt", "".join(f"{g}\n" for g in user_groups())),
-        Artifact("enabled services", other / "enabled-services.txt", "".join(f"{s}\n" for s in services)),
+        Artifact(
+            "official pacman packages",
+            other / "pacman-packages.txt",
+            as_lines(installed_packages(foreign=False)),
+        ),
+        Artifact(
+            "aur packages",
+            other / "yay-packages.txt",
+            as_lines(installed_packages(foreign=True)),
+        ),
+        Artifact("user groups", other / "user-groups.txt", as_lines(user_groups())),
+        Artifact(
+            "enabled services",
+            other / "enabled-services.txt",
+            as_lines(enabled_services()),
+        ),
     ]
 
 
 def count_changes(new: str, old: str) -> tuple[int, int]:
-    before = set(old.split())
-    after = set(new.split())
+    before = set(old.splitlines())
+    after = set(new.splitlines())
     return len(after - before), len(before - after)
 
 
 def write_atomically(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(content)
     os.replace(temporary, path)
@@ -138,79 +145,71 @@ def apply(artifact: Artifact, dry_run: bool) -> Result:
         try:
             write_atomically(artifact.target, artifact.content)
         except OSError as error:
-            return Result(Outcome.FAILED, added, removed)
+            return Result(Outcome.FAILED, added, removed, str(error))
     return Result(outcome, added, removed)
 
 
 def describe(result: Result) -> str:
     if result.outcome is Outcome.UNCHANGED:
-        return "unchanged"
+        return ""
     if result.outcome is Outcome.FAILED:
-        return "failed"
+        return result.reason
     return f"{result.added} added, {result.removed} removed"
 
 
 def build_table(rows: list[tuple[Artifact, Result]]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table = plain_table()
     table.add_column(overflow="ellipsis")
     table.add_column(justify="right", width=9)
-    table.add_column(overflow="ellipsis")
+    table.add_column(overflow="fold")
     styles = {
-        Outcome.CREATED: CREATED,
+        Outcome.CREATED: SUCCESS,
         Outcome.UPDATED: CHANGED,
-        Outcome.UNCHANGED: UNCHANGED,
-        Outcome.FAILED: FAILED,
+        Outcome.UNCHANGED: DIM,
+        Outcome.FAILED: FAILURE,
     }
     for artifact, result in rows:
-        style = styles[result.outcome]
         table.add_row(
             escape(artifact.label),
-            f"[{style}]{result.outcome.value}[/]",
-            f"[{UNCHANGED}]{escape(describe(result))}[/]",
+            f"[{styles[result.outcome]}]{result.outcome.value}[/]",
+            f"[{DIM}]{escape(describe(result))}[/]",
         )
     return table
-
-
-def show_table(rows: list[tuple[Artifact, Result]], title: str, border: str) -> None:
-    console.print(Panel(build_table(rows), title=title, border_style=border, padding=(0, 1)))
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     if not args.dotfiles.is_dir():
-        console.print(f"[{FAILED}]error:[/] not a directory: {escape(str(args.dotfiles))}")
+        print_error(f"not a directory: {args.dotfiles}")
         return 1
 
     try:
         artifacts = collect(args.dotfiles)
     except BackupError as error:
-        console.print(f"[{FAILED}]error:[/] {escape(str(error))}")
+        print_error(str(error))
         return 1
 
-    rows = []
-    failures = 0
-    for artifact in artifacts:
-        result = apply(artifact, args.diff)
-        rows.append((artifact, result))
-        if result.outcome is Outcome.FAILED:
-            failures += 1
+    rows = [(artifact, apply(artifact, args.diff)) for artifact in artifacts]
+    failures = sum(1 for _, result in rows if result.outcome is Outcome.FAILED)
 
     if args.diff:
-        show_table(rows, "would change", QUESTION)
+        show_panel(build_table(rows), "would change", QUESTION)
         return 1 if failures else 0
 
-    show_table(rows, "backup", "cyan")
+    show_panel(build_table(rows), "backup")
 
     if failures:
-        console.print(f"\n[{FAILED}]{failures} file(s) could not be written[/]")
+        console.print(f"\n[{FAILURE}]{failures} file(s) could not be written[/]")
         return 1
 
-    changed = [r for _, r in rows if r.outcome in (Outcome.CREATED, Outcome.UPDATED)]
-    if changed:
-        console.print(f"\n[{CREATED}]{len(changed)} file(s) written[/]")
+    written = sum(
+        1 for _, result in rows if result.outcome in (Outcome.CREATED, Outcome.UPDATED)
+    )
+    if written:
+        console.print(f"\n[{SUCCESS}]{written} file(s) written[/]")
     else:
-        console.print(f"\n[{UNCHANGED}]no changes[/]")
+        console.print(f"\n[{DIM}]no changes[/]")
     return 0
 
 
@@ -219,14 +218,22 @@ def build_parser() -> argparse.ArgumentParser:
         prog="backup_system_state",
         description="save installed packages, user groups and enabled services into the dotfiles repo",
     )
-    parser.add_argument("-d", "--diff", action="store_true", help="report what would change without writing")
-    parser.add_argument("--dotfiles", type=Path, default=Path(os.environ.get("DOTFILES_PATH", ".")), help="dotfiles repo root")
+    parser.add_argument(
+        "-d",
+        "--diff",
+        action="store_true",
+        help="report what would change without writing",
+    )
+    parser.add_argument(
+        "--dotfiles",
+        type=Path,
+        default=Path(
+            os.environ.get("DOTFILES_PATH", Path(__file__).resolve().parents[1])
+        ),
+        help="dotfiles repo root, defaults to DOTFILES_PATH or the parent of this script",
+    )
     return parser
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except KeyboardInterrupt:
-        console.print("\n[yellow]cancelled[/]")
-        raise SystemExit(130)
+    run_cli(main)
