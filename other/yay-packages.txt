@@ -1,7 +1,10 @@
 ab-av1
 bibata-cursor-git
+claude-desktop-extra
 dualsensectl
+helium-browser-bin
 lazyssh-bin
+orca-ide-bin
 proton-community-updater
 rmlint
 visual-studio-code-bin

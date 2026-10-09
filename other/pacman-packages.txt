@@ -10,7 +10,6 @@ bluez-utils
 btop
 bun
 cava
-chromium
 cliphist
 ddcutil
 delve
@@ -76,6 +75,7 @@ nvidia-open-dkms
 nvidia-utils
 nwg-look
 obsidian
+openbsd-netcat
 opencode
 otf-font-awesome
 pacman-contrib
@@ -100,8 +100,10 @@ qt6ct
 reflector
 resvg
 ripgrep
+ruff
 slurp
 smartmontools
+socat
 sshfs
 starship
 steam
@@ -130,6 +132,7 @@ xorg-xinit
 xsettingsd
 yazi
 zathura-pdf-poppler
+zed
 zip
 zoxide
 zram-generator
