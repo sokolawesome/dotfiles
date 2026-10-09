@@ -25,8 +25,9 @@ PACKAGES = {
     "config": Path.home() / ".config",
     "bin": Path.home() / "bin",
     "agents": Path.home() / ".agents",
+    "claude": Path.home() / ".claude",
 }
-PACKAGE_ORDER = ("home", "config", "bin", "agents")
+PACKAGE_ORDER = ("home", "config", "bin", "agents", "claude")
 
 STOW_FLAGS = ("--no-folding",)
 

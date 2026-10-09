@@ -29,6 +29,7 @@ def test_action_flags(name, flag, verb):
         ("config", str(pathlib.Path.home() / ".config")),
         ("bin", str(pathlib.Path.home() / "bin")),
         ("agents", str(pathlib.Path.home() / ".agents")),
+        ("claude", str(pathlib.Path.home() / ".claude")),
     ],
 )
 def test_package_targets(name, expected):
@@ -63,7 +64,7 @@ def test_stow_command_names_the_source_so_cwd_does_not_matter():
 @pytest.mark.parametrize(
     ("requested", "expected"),
     [
-        ([], ["home", "config", "bin", "agents"]),
+        ([], ["home", "config", "bin", "agents", "claude"]),
         (["bin"], ["bin"]),
         (["agents", "config"], ["config", "agents"]),
     ],
