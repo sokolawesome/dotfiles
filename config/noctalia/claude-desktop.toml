@@ -1,0 +1,3 @@
+[theme.templates.user.claude-desktop]
+input_path = "templates/claude-desktop.json"
+output_path = "$XDG_CONFIG_HOME/Claude/themes.d/noctalia-live.json"
