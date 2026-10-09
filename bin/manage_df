@@ -8,16 +8,19 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from rich.console import Console
+from _common import (
+    FAILURE,
+    SUCCESS,
+    WARNING,
+    console,
+    plain_table,
+    print_error,
+    run_cli,
+    show_panel,
+)
 from rich.markup import escape
-from rich.panel import Panel
 from rich.table import Table
 
-console = Console()
-
-STOWED = "bold green"
-VERBOSE = "yellow"
-FAILED = "red"
 PACKAGE = "bold cyan"
 
 PACKAGES = {
@@ -27,9 +30,9 @@ PACKAGES = {
     "agents": Path.home() / ".agents",
     "claude": Path.home() / ".claude",
 }
-PACKAGE_ORDER = ("home", "config", "bin", "agents", "claude")
 
 STOW_FLAGS = ("--no-folding",)
+SIMULATION_NOTICE = "WARNING: in simulation mode"
 
 
 class ManageError(Exception):
@@ -40,6 +43,14 @@ class ManageError(Exception):
 class Action:
     flag: str
     verb: str
+
+    @property
+    def simulated(self) -> bool:
+        return self.flag == "-n"
+
+    @property
+    def links(self) -> bool:
+        return self.flag in ("", "-R")
 
 
 ACTIONS = {
@@ -58,7 +69,9 @@ class Result:
     detail: str = ""
 
 
-def stow_command(action: Action, source: Path, target: Path, package: str, verbose: bool) -> list[str]:
+def stow_command(
+    action: Action, source: Path, target: Path, package: str, verbose: bool
+) -> list[str]:
     command = ["stow", *STOW_FLAGS]
     if action.flag:
         command.append(action.flag)
@@ -68,25 +81,29 @@ def stow_command(action: Action, source: Path, target: Path, package: str, verbo
     return command
 
 
-def find_stow() -> str:
-    found = shutil.which("stow")
-    if found is None:
+def require_stow() -> None:
+    if shutil.which("stow") is None:
         raise ManageError("gnu stow not found, install with 'sudo pacman -S stow'")
-    return found
 
 
-def ensure_target(target: Path) -> None:
-    target.mkdir(parents=True, exist_ok=True)
-
-
-def selected_packages(requested: list[str]) -> list[str]:
+def selected_packages(requested: list[str] | None) -> list[str]:
     if not requested:
-        return list(PACKAGE_ORDER)
+        return list(PACKAGES)
     unknown = [name for name in requested if name not in PACKAGES]
     if unknown:
-        known = ", ".join(PACKAGE_ORDER)
-        raise ManageError(f"unknown package(s): {', '.join(unknown)}. known: {known}")
-    return [name for name in PACKAGE_ORDER if name in requested]
+        raise ManageError(
+            f"unknown package(s): {', '.join(unknown)}. known: {', '.join(PACKAGES)}"
+        )
+    return [name for name in PACKAGES if name in requested]
+
+
+def stow_output(finished: subprocess.CompletedProcess) -> str:
+    lines = f"{finished.stdout}\n{finished.stderr}".splitlines()
+    return "\n".join(
+        line
+        for line in lines
+        if line.strip() and not line.startswith(SIMULATION_NOTICE)
+    )
 
 
 def run_package(source: Path, package: str, action: Action, verbose: bool) -> Result:
@@ -94,54 +111,62 @@ def run_package(source: Path, package: str, action: Action, verbose: bool) -> Re
     if not (source / package).is_dir():
         return Result(package, target, "missing")
 
-    ensure_target(target)
+    if not target.is_dir():
+        if action.links:
+            target.mkdir(parents=True)
+        elif action.simulated:
+            return Result(package, target, "done", f"MKDIR: {target}, then link everything in {package}")
+        else:
+            return Result(package, target, "done")
     command = stow_command(action, source, target, package, verbose)
     finished = subprocess.run(command, capture_output=True, text=True, check=False)
+    output = stow_output(finished)
     if finished.returncode != 0:
-        return Result(package, target, "failed", finished.stderr.strip() or finished.stdout.strip())
-    detail = finished.stdout.strip() if verbose else ""
-    return Result(package, target, "done", detail)
+        return Result(package, target, "failed", output)
+    return Result(package, target, "done", output if verbose else "")
 
 
 def build_table(results: list[Result]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table = plain_table()
     table.add_column(width=8)
     table.add_column(overflow="ellipsis")
     table.add_column(overflow="fold")
     styles = {
-        "done": STOWED,
-        "failed": FAILED,
-        "missing": VERBOSE,
+        "done": SUCCESS,
+        "failed": FAILURE,
+        "missing": WARNING,
     }
     for result in results:
-        style = styles[result.outcome]
         table.add_row(
             f"[{PACKAGE}]{result.package}[/]",
-            f"[{style}]{result.outcome}[/]",
+            f"[{styles[result.outcome]}]{result.outcome}[/]",
             f"[dim]{escape(str(result.target))}[/]",
         )
     return table
 
 
 def build_detail(results: list[Result]) -> Table:
-    table = Table(box=None, pad_edge=False, show_edge=False, show_header=False)
+    table = plain_table()
+    table.add_column(width=8)
     table.add_column(overflow="fold")
     for result in results:
-        if result.detail:
-            for line in result.detail.splitlines():
-                table.add_row(f"[dim]{escape(line)}[/]")
+        for line in result.detail.splitlines():
+            table.add_row(f"[{PACKAGE}]{result.package}[/]", f"[dim]{escape(line)}[/]")
     return table
 
 
 def report(action: Action, results: list[Result], verbose: bool) -> int:
-    console.print(Panel(build_table(results), title=action.verb, border_style="cyan", padding=(0, 1)))
+    show_panel(build_table(results), action.verb)
+    failures = [result for result in results if result.outcome == "failed"]
+    succeeded = [result for result in results if result.outcome == "done"]
     if verbose:
-        console.print(Panel(build_detail(results), title="stow output", border_style=VERBOSE, padding=(0, 1)))
+        if any(result.detail for result in succeeded):
+            show_panel(build_detail(succeeded), "stow output", WARNING)
+        else:
+            console.print("[dim]stow made no changes[/]")
 
-    failures = [r for r in results if r.outcome == "failed"]
     if failures:
-        names = ", ".join(r.package for r in failures)
-        console.print(f"\n[red]failed:[/] {escape(names)}")
+        show_panel(build_detail(failures), "errors", FAILURE)
         return 1
     return 0
 
@@ -149,48 +174,76 @@ def report(action: Action, results: list[Result], verbose: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     action = ACTIONS[args.action]
+    verbose = args.verbose or action.simulated
 
     try:
-        find_stow()
+        require_stow()
         packages = selected_packages(args.package)
     except ManageError as error:
-        console.print(f"[red]error:[/] {escape(str(error))}")
+        print_error(str(error))
         return 1
 
     source = args.dotfiles
     if not source.is_dir():
-        console.print(f"[red]error:[/] not a directory: {escape(str(source))}")
+        print_error(f"not a directory: {source}")
         return 1
 
-    results = [run_package(source, package, action, args.verbose) for package in packages]
-    return report(action, results, args.verbose)
+    results = [run_package(source, package, action, verbose) for package in packages]
+    return report(action, results, verbose)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="manage_df",
         description="stow the dotfiles packages with gnu stow",
-        epilog=f"packages: {', '.join(PACKAGE_ORDER)}",
+        epilog=f"packages: {', '.join(PACKAGES)}",
     )
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("-R", "--restow", action="store_const", const="restow", dest="action", help="remove then stow")
-    mode.add_argument("-D", "--delete", action="store_const", const="unstow", dest="action", help="remove the symlinks")
-    mode.add_argument("-n", "--dry-run", action="store_const", const="dry-run", dest="action", help="show what would happen")
+    mode.add_argument(
+        "-R",
+        "--restow",
+        action="store_const",
+        const="restow",
+        dest="action",
+        help="remove then stow",
+    )
+    mode.add_argument(
+        "-D",
+        "--delete",
+        action="store_const",
+        const="unstow",
+        dest="action",
+        help="remove the symlinks",
+    )
+    mode.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_const",
+        const="dry-run",
+        dest="action",
+        help="show what stow would change",
+    )
     parser.set_defaults(action="stow")
-    parser.add_argument("-p", "--package", action="append", metavar="NAME", help="limit to one package, repeatable")
-    parser.add_argument("-v", "--verbose", action="store_true", help="show stow's own output")
+    parser.add_argument(
+        "-p",
+        "--package",
+        action="append",
+        metavar="NAME",
+        help="limit to one package, repeatable",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="show stow's own output"
+    )
     parser.add_argument(
         "--dotfiles",
         type=Path,
-        default=Path(os.environ.get("DOTFILES_PATH", Path(__file__).resolve().parents[1])),
+        default=Path(
+            os.environ.get("DOTFILES_PATH", Path(__file__).resolve().parents[1])
+        ),
         help="dotfiles repo root, defaults to DOTFILES_PATH or the parent of this script",
     )
     return parser
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except KeyboardInterrupt:
-        console.print("\n[yellow]cancelled[/]")
-        raise SystemExit(130)
+    run_cli(main)
