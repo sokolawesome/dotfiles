@@ -24,6 +24,7 @@ function get-target-directory
         config) echo "$HOME/.config" ;;
         bin) echo "$HOME/bin" ;;
         agents) echo "$HOME/.agents" ;;
+        claude) echo "$HOME/.claude" ;;
         *) return 1 ;;
     esac
 }
@@ -33,7 +34,7 @@ function ensure-target-exists
     local target="$1"
     local dir_name="$2"
 
-    if [ "$dir_name" = "config" ] || [ "$dir_name" = "bin" ] || [ "$dir_name" = "agents" ]
+    if [ "$dir_name" = "config" ] || [ "$dir_name" = "bin" ] || [ "$dir_name" = "agents" ] || [ "$dir_name" = "claude" ]
     then
         if [ ! -d "$target" ]
         then
@@ -65,7 +66,7 @@ function execute-stow
 
 function process-directories
 {
-    for dir in home config bin agents
+    for dir in home config bin agents claude
     do
         if ! validate-source-directory "$dir"
         then
