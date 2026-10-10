@@ -139,4 +139,13 @@
       }
     }
   },
+  "lsp": {
+    "basedpyright": {
+      "settings": {
+        "basedpyright.analysis": {
+          "typeCheckingMode": "standard"
+        }
+      }
+    }
+  },
 }
