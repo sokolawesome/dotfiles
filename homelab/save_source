@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""qBittorrent on-finish hook that writes the torrent into .source files."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import urllib.parse
+from datetime import datetime, timezone
+from pathlib import Path
+
+SOURCE_FILE = ".source"
+TORRENT_HEADER = "[torrent]"
+TIME_FORMAT = "%Y-%m-%d %H:%M"
+VIDEO_SUFFIXES = (".mkv", ".mp4", ".avi")
+SIZE_UNITS = ("B", "KiB", "MiB", "GiB", "TiB")
+UNIT_STEP = 1024
+
+WRITTEN = "written"
+UPDATED = "updated"
+UNCHANGED = "unchanged"
+MISSING = "not found"
+SHARED_FOLDER = "single file in a folder with other downloads, left alone"
+SAVED = (WRITTEN, UPDATED, UNCHANGED)
+
+
+class Arguments(argparse.Namespace):
+    hash: str = ""
+    name: str = ""
+    path: str = ""
+    tracker: str = ""
+    size: int = 0
+    category: str = ""
+    tags: str = ""
+    comment: str = ""
+
+
+def toml_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def render_torrent(torrent: dict[str, str]) -> str:
+    lines = [TORRENT_HEADER]
+    lines += [f"{key} = {toml_string(value)}" for key, value in torrent.items() if value]
+    return "\n".join(lines) + "\n"
+
+
+def folders_to_mark(root: Path) -> list[Path]:
+    video_folders = {
+        path.parent for path in root.rglob("*") if path.suffix.lower() in VIDEO_SUFFIXES and path.is_file()
+    }
+    return [root, *sorted(video_folders - {root})]
+
+
+def holds_only(folder: Path, video: Path) -> bool:
+    others = (entry for entry in folder.iterdir() if entry != video)
+    return not any(entry.is_dir() or entry.suffix.lower() in VIDEO_SUFFIXES for entry in others)
+
+
+def write_torrent(folder: Path, torrent: dict[str, str]) -> str:
+    source = folder / SOURCE_FILE
+    text = render_torrent(torrent)
+    if not source.exists():
+        result = WRITTEN
+    elif source.read_text() != text:
+        result = UPDATED
+    else:
+        return UNCHANGED
+    source.write_text(text)
+    return result
+
+
+def save(content_path: Path, torrent: dict[str, str]) -> list[tuple[str, Path]]:
+    if content_path.is_dir():
+        folders = folders_to_mark(content_path)
+    elif not content_path.is_file():
+        return [(MISSING, content_path)]
+    elif holds_only(content_path.parent, content_path):
+        folders = [content_path.parent]
+    else:
+        return [(SHARED_FOLDER, content_path)]
+    return [(write_torrent(folder, torrent), folder) for folder in folders]
+
+
+def format_size(size: int) -> str:
+    value = float(size)
+    step = 0
+    while value >= UNIT_STEP and step < len(SIZE_UNITS) - 1:
+        value /= UNIT_STEP
+        step += 1
+    precision = 0 if step == 0 else 2
+    return f"{value:.{precision}f} {SIZE_UNITS[step]}"
+
+
+def magnet(info_hash: str, name: str, size: int, tracker: str) -> str:
+    parameters = [("xt", f"urn:btih:{info_hash}"), ("dn", name)]
+    if size:
+        parameters.append(("xl", str(size)))
+    if tracker:
+        parameters.append(("tr", tracker))
+    return "magnet:?" + urllib.parse.urlencode(parameters, safe=":", quote_via=urllib.parse.quote)
+
+
+def run(args: Arguments) -> int:
+    torrent = {
+        "name": args.name,
+        "hash": args.hash,
+        "magnet": magnet(args.hash, args.name, args.size, args.tracker),
+        "size": format_size(args.size) if args.size else "",
+        "category": args.category,
+        "tags": args.tags,
+        "comment": args.comment,
+        "finished": datetime.now(timezone.utc).astimezone().strftime(TIME_FORMAT),
+    }
+    results = save(Path(args.path), torrent)
+    for result, path in results:
+        if result != UNCHANGED:
+            print(f"{result}: {path}", file=sys.stderr)
+    return 0 if all(result in SAVED for result, _ in results) else 1
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="save_source",
+        description=f"write the torrent behind a finished qbittorrent download into {SOURCE_FILE}",
+    )
+    parser.add_argument("--hash", required=True, help="%%I, info hash v1")
+    parser.add_argument("--name", required=True, help="%%N, torrent name")
+    parser.add_argument("--path", required=True, help="%%F, content path")
+    parser.add_argument("--tracker", help="%%T, current tracker")
+    parser.add_argument("--size", type=int, help="%%Z, torrent size in bytes")
+    parser.add_argument("--category", help="%%L, category")
+    parser.add_argument("--tags", help="%%G, tags separated by commas")
+    parser.add_argument("--comment", help="%%M, comment")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv, namespace=Arguments())
+    try:
+        return run(args)
+    except OSError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        raise SystemExit(130)
