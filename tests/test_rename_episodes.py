@@ -20,7 +20,9 @@ def season_folder(tmp_path, *names, folder="Season 1"):
 
 
 def files(directory):
-    return {path.name: path.read_text() for path in directory.iterdir() if path.is_file()}
+    return {
+        path.name: path.read_text() for path in directory.iterdir() if path.is_file()
+    }
 
 
 @pytest.mark.parametrize(
@@ -53,7 +55,13 @@ def test_episode_number(name, expected):
 
 @pytest.mark.parametrize(
     "name",
-    ["random.mkv", "Show.2024.1080p.mkv", "Show.Name.E07.mkv", "Show.abc.mkv", "Show 1920x1080.mkv"],
+    [
+        "random.mkv",
+        "Show.2024.1080p.mkv",
+        "Show.Name.E07.mkv",
+        "Show.abc.mkv",
+        "Show 1920x1080.mkv",
+    ],
 )
 def test_no_episode_number(name):
     assert rename_episodes.match_number(name) is None
@@ -108,14 +116,19 @@ def test_season_from_the_folder_name(folder, expected):
 
 
 def test_renames_using_the_season_from_the_folder(tmp_path, monkeypatch, capsys):
-    folder = season_folder(tmp_path, "Show - 05.mkv", "Show - 05.rus.anilibria.ass", folder="Season 2")
+    folder = season_folder(
+        tmp_path, "Show - 05.mkv", "Show - 05.rus.anilibria.ass", folder="Season 2"
+    )
     answer(monkeypatch, "y")
 
     code = rename_episodes.main([str(folder)])
 
     assert code == 0
     assert "detected season 02" in capsys.readouterr().out
-    assert files(folder) == {"S02E05.mkv": "Show - 05.mkv", "S02E05.rus.anilibria.ass": "Show - 05.rus.anilibria.ass"}
+    assert files(folder) == {
+        "S02E05.mkv": "Show - 05.mkv",
+        "S02E05.rus.anilibria.ass": "Show - 05.rus.anilibria.ass",
+    }
 
 
 def test_season_flag_beats_the_folder_name(tmp_path, monkeypatch, capsys):
@@ -167,25 +180,37 @@ def test_no_season_anywhere_is_an_error(tmp_path, capsys):
     assert list(files(folder)) == ["Show - 05.mkv"]
 
 
-def test_negative_offset_turns_absolute_numbers_into_season_numbers(tmp_path, monkeypatch):
-    folder = season_folder(tmp_path, "Show - 101.mkv", "Show - 102.mkv", "Show - 112.mkv")
+def test_negative_offset_turns_absolute_numbers_into_season_numbers(
+    tmp_path, monkeypatch
+):
+    folder = season_folder(
+        tmp_path, "Show - 101.mkv", "Show - 102.mkv", "Show - 112.mkv"
+    )
     answer(monkeypatch, "y")
 
     code = rename_episodes.main(["--offset", "-100", str(folder)])
 
     assert code == 0
-    assert files(folder) == {"S01E01.mkv": "Show - 101.mkv", "S01E02.mkv": "Show - 102.mkv", "S01E12.mkv": "Show - 112.mkv"}
+    assert files(folder) == {
+        "S01E01.mkv": "Show - 101.mkv",
+        "S01E02.mkv": "Show - 102.mkv",
+        "S01E12.mkv": "Show - 112.mkv",
+    }
 
 
 @pytest.mark.parametrize("offset", [1, -1])
-def test_offset_on_named_files_moves_every_episode_without_overwriting(tmp_path, monkeypatch, offset):
+def test_offset_on_named_files_moves_every_episode_without_overwriting(
+    tmp_path, monkeypatch, offset
+):
     folder = season_folder(tmp_path, "S01E02.mkv", "S01E03.mkv", "S01E04.mkv")
     answer(monkeypatch, "y")
 
     code = rename_episodes.main(["-o", str(offset), str(folder)])
 
     assert code == 0
-    assert files(folder) == {f"S01E0{n + offset}.mkv": f"S01E0{n}.mkv" for n in (2, 3, 4)}
+    assert files(folder) == {
+        f"S01E0{n + offset}.mkv": f"S01E0{n}.mkv" for n in (2, 3, 4)
+    }
 
 
 def test_files_below_episode_one_after_the_offset_are_skipped(tmp_path, monkeypatch):
@@ -198,13 +223,20 @@ def test_files_below_episode_one_after_the_offset_are_skipped(tmp_path, monkeypa
 
 
 def test_unrecognised_files_are_listed_and_left_alone(tmp_path, monkeypatch, capsys):
-    folder = season_folder(tmp_path, "Show - 05.mkv", "trailer.mkv", "notes.txt", "poster.jpg")
+    folder = season_folder(
+        tmp_path, "Show - 05.mkv", "trailer.mkv", "notes.txt", "poster.jpg"
+    )
     answer(monkeypatch, "y")
 
     rename_episodes.main([str(folder)])
 
     assert "trailer.mkv" in capsys.readouterr().out
-    assert sorted(files(folder)) == ["S01E05.mkv", "notes.txt", "poster.jpg", "trailer.mkv"]
+    assert sorted(files(folder)) == [
+        "S01E05.mkv",
+        "notes.txt",
+        "poster.jpg",
+        "trailer.mkv",
+    ]
 
 
 def test_files_in_subfolders_are_ignored(tmp_path, monkeypatch):

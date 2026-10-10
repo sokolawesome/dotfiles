@@ -7,8 +7,21 @@ from conftest import load_module
 
 backup_system_state = load_module("backup_system_state")
 
-SYSTEM_UNITS = ("systemctl", "list-unit-files", "--state=enabled", "--no-pager", "--no-legend")
-USER_UNITS = ("systemctl", "--user", "list-unit-files", "--state=enabled", "--no-pager", "--no-legend")
+SYSTEM_UNITS = (
+    "systemctl",
+    "list-unit-files",
+    "--state=enabled",
+    "--no-pager",
+    "--no-legend",
+)
+USER_UNITS = (
+    "systemctl",
+    "--user",
+    "list-unit-files",
+    "--state=enabled",
+    "--no-pager",
+    "--no-legend",
+)
 SYSTEM = {
     ("pacman", "-Qqen"): "zsh\nbase\n",
     ("pacman", "-Qqem"): "yay-bin\n",
@@ -19,10 +32,12 @@ SYSTEM = {
 
 
 def fake_system(monkeypatch, failing=None):
-    def run(command, **kwargs):
+    def run(command, **_options):
         key = tuple(command)
         if key == failing:
-            return subprocess.CompletedProcess(command, 1, "", "Failed to connect to bus\n")
+            return subprocess.CompletedProcess(
+                command, 1, "", "Failed to connect to bus\n"
+            )
         return subprocess.CompletedProcess(command, 0, SYSTEM[key], "")
 
     monkeypatch.setattr(backup_system_state.subprocess, "run", run)
@@ -80,11 +95,14 @@ def test_a_failing_command_leaves_every_file_alone(tmp_path, monkeypatch, capsys
 
     assert code == 1
     assert "Failed to connect to bus" in capsys.readouterr().out
-    assert saved(tmp_path) == {"enabled-services.txt": "keep me\n", "pacman-packages.txt": "keep me\n"}
+    assert saved(tmp_path) == {
+        "enabled-services.txt": "keep me\n",
+        "pacman-packages.txt": "keep me\n",
+    }
 
 
 def test_a_missing_command_is_reported(tmp_path, monkeypatch, capsys):
-    def run(command, **kwargs):
+    def run(command, **_options):
         raise FileNotFoundError(2, "No such file or directory", command[0])
 
     monkeypatch.setattr(backup_system_state.subprocess, "run", run)
@@ -112,7 +130,12 @@ def test_writing_leaves_no_temporary_files(tmp_path, monkeypatch):
 
     backup_system_state.main(["--dotfiles", str(tmp_path)])
 
-    assert sorted(saved(tmp_path)) == ["enabled-services.txt", "pacman-packages.txt", "user-groups.txt", "yay-packages.txt"]
+    assert sorted(saved(tmp_path)) == [
+        "enabled-services.txt",
+        "pacman-packages.txt",
+        "user-groups.txt",
+        "yay-packages.txt",
+    ]
 
 
 def test_a_missing_dotfiles_directory_is_reported(tmp_path, capsys):
@@ -152,7 +175,10 @@ def test_changes_list_the_added_and_removed_names(tmp_path, monkeypatch, capsys)
 
     backup_system_state.main(["--dotfiles", str(tmp_path)])
 
-    rows = [" ".join(line.strip("│ ").split()) for line in capsys.readouterr().out.splitlines()]
+    rows = [
+        " ".join(line.strip("│ ").split())
+        for line in capsys.readouterr().out.splitlines()
+    ]
     assert "pacman packages + zsh" in rows
     assert "- vim" in rows
 

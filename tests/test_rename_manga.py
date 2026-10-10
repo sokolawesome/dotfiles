@@ -18,7 +18,9 @@ def library(tmp_path, *names):
 
 
 def files(directory):
-    return {path.name: path.read_text() for path in directory.iterdir() if path.is_file()}
+    return {
+        path.name: path.read_text() for path in directory.iterdir() if path.is_file()
+    }
 
 
 def target(name):
@@ -98,18 +100,25 @@ def test_renames_volumes_and_chapters(tmp_path, monkeypatch, capsys):
     assert "done - 3 files renamed" in capsys.readouterr().out
 
 
-def test_preview_lists_volumes_first_then_chapters_in_number_order(tmp_path, monkeypatch, capsys):
+def test_preview_lists_volumes_first_then_chapters_in_number_order(
+    tmp_path, monkeypatch, capsys
+):
     library(tmp_path, "c1000.cbz", "Show 999.cbz", "Show v02.cbz", "Show v01.cbz")
     answer(monkeypatch, "n")
 
     rename_manga.main([str(tmp_path)])
 
     out = capsys.readouterr().out
-    positions = [out.index(name) for name in ("Show v01.cbz", "Show v02.cbz", "Show 999.cbz", "c1000.cbz")]
+    positions = [
+        out.index(name)
+        for name in ("Show v01.cbz", "Show v02.cbz", "Show 999.cbz", "c1000.cbz")
+    ]
     assert positions == sorted(positions)
 
 
-def test_files_without_a_number_are_listed_and_left_alone(tmp_path, monkeypatch, capsys):
+def test_files_without_a_number_are_listed_and_left_alone(
+    tmp_path, monkeypatch, capsys
+):
     library(tmp_path, "v01.cbz", "extra.cbz", "cover.jpg")
     answer(monkeypatch, "y")
 

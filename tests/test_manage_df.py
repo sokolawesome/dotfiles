@@ -7,7 +7,9 @@ from conftest import load_module
 
 manage_df = load_module("manage_df")
 
-needs_stow = pytest.mark.skipif(shutil.which("stow") is None, reason="gnu stow is not installed")
+needs_stow = pytest.mark.skipif(
+    shutil.which("stow") is None, reason="gnu stow is not installed"
+)
 
 
 @pytest.fixture
@@ -17,7 +19,10 @@ def repo(tmp_path, monkeypatch):
     (source / "bin" / "tool").write_text("tool")
     (source / "config" / "app").mkdir(parents=True)
     (source / "config" / "app" / "settings.toml").write_text("settings")
-    targets = {"bin": tmp_path / "home" / "bin", "config": tmp_path / "home" / ".config"}
+    targets = {
+        "bin": tmp_path / "home" / "bin",
+        "config": tmp_path / "home" / ".config",
+    }
     monkeypatch.setattr(manage_df, "PACKAGES", targets)
     return source, targets
 
@@ -34,7 +39,9 @@ def test_stow_links_every_package(repo):
 
     assert code == 0
     assert (targets["bin"] / "tool").resolve() == source / "bin" / "tool"
-    assert (targets["config"] / "app" / "settings.toml").resolve() == source / "config" / "app" / "settings.toml"
+    assert (
+        targets["config"] / "app" / "settings.toml"
+    ).resolve() == source / "config" / "app" / "settings.toml"
 
 
 @needs_stow
@@ -158,7 +165,7 @@ def test_missing_dotfiles_directory_is_reported(tmp_path, capsys):
     assert "not a directory" in capsys.readouterr().out
 
 
-def test_restow_and_delete_cannot_be_combined(capsys):
+def test_restow_and_delete_cannot_be_combined():
     with pytest.raises(SystemExit) as exit_info:
         manage_df.main(["-R", "-D"])
 

@@ -14,7 +14,11 @@ ENTER = "\r"
 SPACE = " "
 CTRL_C = "\x03"
 
-OPTIONS = [Option("a", ("audio", "jpn")), Option("b", ("audio", "eng")), Option("c", ("subtitles", "eng"))]
+OPTIONS = [
+    Option("a", ("audio", "jpn")),
+    Option("b", ("audio", "eng")),
+    Option("c", ("subtitles", "eng")),
+]
 
 
 def press(keys, picker):
@@ -25,7 +29,9 @@ def press(keys, picker):
 
 
 def answer(monkeypatch, *lines):
-    monkeypatch.setattr("sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines)))
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines))
+    )
 
 
 def checkbox(checked=(), required=False):
@@ -37,12 +43,20 @@ def select(default=0):
 
 
 def test_rows_line_up_in_columns():
-    assert _prompts.aligned_rows(OPTIONS) == ["audio      jpn", "audio      eng", "subtitles  eng"]
+    assert _prompts.aligned_rows(OPTIONS) == [
+        "audio      jpn",
+        "audio      eng",
+        "subtitles  eng",
+    ]
 
 
 @pytest.mark.parametrize(
     ("count", "summary"),
-    [(0, "none"), (2, "audio jpn, audio eng"), (5, "audio jpn, audio eng, subtitles eng and 2 more")],
+    [
+        (0, "none"),
+        (2, "audio jpn, audio eng"),
+        (5, "audio jpn, audio eng, subtitles eng and 2 more"),
+    ],
 )
 def test_the_summary_names_three_picks_at_most(count, summary):
     assert _prompts.summary_of((OPTIONS * 2)[:count]) == summary
@@ -82,8 +96,12 @@ def test_typed_picks_take_numbers(monkeypatch):
     assert _prompts.choose_many("pick", OPTIONS) == ["c", "a"]
 
 
-@pytest.mark.parametrize(("typed", "picked"), [("all", ["a", "b", "c"]), ("none", []), ("", ["b"])])
-def test_typed_picks_take_words_and_default_to_the_ticked_rows(monkeypatch, typed, picked):
+@pytest.mark.parametrize(
+    ("typed", "picked"), [("all", ["a", "b", "c"]), ("none", []), ("", ["b"])]
+)
+def test_typed_picks_take_words_and_default_to_the_ticked_rows(
+    monkeypatch, typed, picked
+):
     answer(monkeypatch, typed)
 
     assert _prompts.choose_many("pick", OPTIONS, checked=["b"]) == picked
@@ -96,8 +114,12 @@ def test_typed_picks_refuse_none_when_an_answer_is_required(monkeypatch, capsys)
     assert capsys.readouterr().out.count("pick numbers between 1 and 3, or 'all'") == 2
 
 
-@pytest.mark.parametrize(("typed", "picked"), [("2", "b"), ("audio eng", "b"), ("s", "c"), ("", "a")])
-def test_typed_choice_takes_a_number_a_name_or_a_unique_start(monkeypatch, typed, picked):
+@pytest.mark.parametrize(
+    ("typed", "picked"), [("2", "b"), ("audio eng", "b"), ("s", "c"), ("", "a")]
+)
+def test_typed_choice_takes_a_number_a_name_or_a_unique_start(
+    monkeypatch, typed, picked
+):
     answer(monkeypatch, typed)
 
     assert _prompts.choose_one("pick", OPTIONS) == picked
@@ -113,7 +135,9 @@ def test_typed_choice_asks_again_for_an_ambiguous_start(monkeypatch, capsys):
 def test_typed_text_asks_until_the_check_passes(monkeypatch, capsys):
     answer(monkeypatch, "", "x", "42")
 
-    answer_text = _prompts.ask_text("year", check=lambda text: None if text.isdigit() else "digits only")
+    answer_text = _prompts.ask_text(
+        "year", check=lambda text: None if text.isdigit() else "digits only"
+    )
 
     out = capsys.readouterr().out
     assert answer_text == "42"

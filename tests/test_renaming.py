@@ -54,7 +54,9 @@ def test_rename_all_renames_after_a_yes(tmp_path, monkeypatch, capsys):
     make(tmp_path, **{"Show - 05.mkv": "five"})
     answer(monkeypatch, "y")
 
-    code = _renaming.rename_all(tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv")), [])
+    code = _renaming.rename_all(
+        tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv")), []
+    )
 
     assert code == 0
     assert "done - 1 file renamed" in capsys.readouterr().out
@@ -65,7 +67,9 @@ def test_rename_all_changes_nothing_after_a_no(tmp_path, monkeypatch, capsys):
     make(tmp_path, **{"Show - 05.mkv": "five"})
     answer(monkeypatch, "n")
 
-    code = _renaming.rename_all(tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv")), [])
+    code = _renaming.rename_all(
+        tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv")), []
+    )
 
     assert code == 1
     assert "cancelled" in capsys.readouterr().out
@@ -78,11 +82,16 @@ def test_rename_all_shows_the_plan_before_asking(tmp_path, monkeypatch, capsys):
 
     _renaming.rename_all(
         tmp_path,
-        renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv"), ("S01E06.mkv", "S01E06.mkv")),
+        renames(
+            tmp_path, ("Show - 05.mkv", "S01E05.mkv"), ("S01E06.mkv", "S01E06.mkv")
+        ),
         [tmp_path / "extra.mkv"],
     )
 
-    rows = [" ".join(line.strip("│ ").split()) for line in capsys.readouterr().out.splitlines()]
+    rows = [
+        " ".join(line.strip("│ ").split())
+        for line in capsys.readouterr().out.splitlines()
+    ]
     assert "Show - 05.mkv → S01E05.mkv" in rows
     assert "S01E06.mkv · unchanged" in rows
     assert "extra.mkv" in rows
@@ -93,7 +102,9 @@ def test_rename_all_stops_early_when_everything_is_named(tmp_path, capsys):
     make(tmp_path, **{"S01E01.mkv": "", "S01E02.mkv": ""})
 
     code = _renaming.rename_all(
-        tmp_path, renames(tmp_path, ("S01E01.mkv", "S01E01.mkv"), ("S01E02.mkv", "S01E02.mkv")), []
+        tmp_path,
+        renames(tmp_path, ("S01E01.mkv", "S01E01.mkv"), ("S01E02.mkv", "S01E02.mkv")),
+        [],
     )
 
     out = capsys.readouterr().out
@@ -106,7 +117,11 @@ def test_rename_all_refuses_two_files_with_one_target(tmp_path, capsys):
     make(tmp_path, **{"Show - 05.mkv": "a", "Show [05].mkv": "b"})
 
     code = _renaming.rename_all(
-        tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv"), ("Show [05].mkv", "S01E05.mkv")), []
+        tmp_path,
+        renames(
+            tmp_path, ("Show - 05.mkv", "S01E05.mkv"), ("Show [05].mkv", "S01E05.mkv")
+        ),
+        [],
     )
 
     out = capsys.readouterr().out
@@ -118,7 +133,9 @@ def test_rename_all_refuses_two_files_with_one_target(tmp_path, capsys):
 def test_rename_all_refuses_a_name_held_by_a_file_that_stays(tmp_path, capsys):
     make(tmp_path, **{"Show - 05.mkv": "new", "S01E05.mkv": "old"})
 
-    code = _renaming.rename_all(tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv")), [])
+    code = _renaming.rename_all(
+        tmp_path, renames(tmp_path, ("Show - 05.mkv", "S01E05.mkv")), []
+    )
 
     assert code == 1
     assert "would not move" in capsys.readouterr().out
@@ -126,7 +143,9 @@ def test_rename_all_refuses_a_name_held_by_a_file_that_stays(tmp_path, capsys):
 
 
 @pytest.mark.parametrize("step", [1, -1])
-def test_rename_all_shifts_a_run_of_files_without_losing_any(tmp_path, monkeypatch, step):
+def test_rename_all_shifts_a_run_of_files_without_losing_any(
+    tmp_path, monkeypatch, step
+):
     make(tmp_path, E2="two", E3="three", E4="four")
     answer(monkeypatch, "y")
     pending = renames(tmp_path, *((f"E{n}", f"E{n + step}") for n in (2, 3, 4)))
@@ -134,7 +153,11 @@ def test_rename_all_shifts_a_run_of_files_without_losing_any(tmp_path, monkeypat
     code = _renaming.rename_all(tmp_path, pending, [])
 
     assert code == 0
-    assert files(tmp_path) == {f"E{2 + step}": "two", f"E{3 + step}": "three", f"E{4 + step}": "four"}
+    assert files(tmp_path) == {
+        f"E{2 + step}": "two",
+        f"E{3 + step}": "three",
+        f"E{4 + step}": "four",
+    }
 
 
 def test_rename_all_returns_one_when_a_rename_fails(tmp_path, monkeypatch, capsys):

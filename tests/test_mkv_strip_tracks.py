@@ -23,13 +23,23 @@ def notifications(monkeypatch):
 
 
 def answer(monkeypatch, *lines):
-    monkeypatch.setattr("sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines)))
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines))
+    )
 
 
 def make_mkv(path, audio, subtitles):
     subtitle_file = path.with_suffix(".srt")
     subtitle_file.write_text("1\n00:00:00,000 --> 00:00:01,000\nhi\n")
-    command = ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=32x32:d=1"]
+    command = [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=black:s=32x32:d=1",
+    ]
     for _ in audio:
         command += ["-f", "lavfi", "-i", "sine=d=1"]
     for _ in subtitles:
@@ -49,9 +59,17 @@ def make_mkv(path, audio, subtitles):
 
 
 def tracks_in(path):
-    identified = json.loads(subprocess.run(["mkvmerge", "-J", str(path)], capture_output=True, text=True, check=True).stdout)
+    identified = json.loads(
+        subprocess.run(
+            ["mkvmerge", "-J", str(path)], capture_output=True, text=True, check=True
+        ).stdout
+    )
     return [
-        (track["type"], track["properties"].get("language"), track["properties"].get("track_name", ""))
+        (
+            track["type"],
+            track["properties"].get("language"),
+            track["properties"].get("track_name", ""),
+        )
         for track in identified["tracks"]
         if track["type"] != "video"
     ]
@@ -78,7 +96,11 @@ def test_a_kind_you_did_not_pick_stays_untouched(tmp_path, monkeypatch):
 
     mkv.main([str(tmp_path)])
 
-    assert tracks_in(movie) == [("audio", "eng", ""), ("subtitles", "eng", ""), ("subtitles", "rus", "")]
+    assert tracks_in(movie) == [
+        ("audio", "eng", ""),
+        ("subtitles", "eng", ""),
+        ("subtitles", "rus", ""),
+    ]
 
 
 @needs_tools
@@ -96,7 +118,9 @@ def test_answering_none_for_a_missing_language_removes_that_kind(tmp_path, monke
 @needs_tools
 def test_a_replacement_track_is_kept_for_a_missing_language(tmp_path, monkeypatch):
     make_mkv(tmp_path / "a.mkv", audio=["eng", "jpn"], subtitles=["eng", "rus"])
-    partial = make_mkv(tmp_path / "b.mkv", audio=["eng", "jpn"], subtitles=["rus", "spa"])
+    partial = make_mkv(
+        tmp_path / "b.mkv", audio=["eng", "jpn"], subtitles=["rus", "spa"]
+    )
     answer(monkeypatch, "1 3", "1", "y")
 
     mkv.main([str(tmp_path)])
@@ -106,7 +130,9 @@ def test_a_replacement_track_is_kept_for_a_missing_language(tmp_path, monkeypatc
 
 @needs_tools
 def test_two_tracks_in_one_language_ask_which_to_keep(tmp_path, monkeypatch):
-    movie = make_mkv(tmp_path / "a.mkv", audio=["eng:Main", "eng:Commentary", "jpn"], subtitles=[])
+    movie = make_mkv(
+        tmp_path / "a.mkv", audio=["eng:Main", "eng:Commentary", "jpn"], subtitles=[]
+    )
     answer(monkeypatch, "1", "1", "y")
 
     mkv.main([str(tmp_path)])
@@ -115,7 +141,9 @@ def test_two_tracks_in_one_language_ask_which_to_keep(tmp_path, monkeypatch):
 
 
 @needs_tools
-def test_a_file_that_already_has_only_the_picked_tracks_is_not_remuxed(tmp_path, monkeypatch, capsys):
+def test_a_file_that_already_has_only_the_picked_tracks_is_not_remuxed(
+    tmp_path, monkeypatch, capsys
+):
     movie = make_mkv(tmp_path / "a.mkv", audio=["eng"], subtitles=["eng"])
     before = movie.stat().st_mtime_ns
     answer(monkeypatch, "all")
@@ -140,7 +168,9 @@ def test_declining_changes_nothing(tmp_path, monkeypatch, capsys):
 
 
 @needs_tools
-def test_an_unreadable_file_is_reported_and_the_rest_are_stripped(tmp_path, monkeypatch, capsys):
+def test_an_unreadable_file_is_reported_and_the_rest_are_stripped(
+    tmp_path, monkeypatch, capsys
+):
     movie = make_mkv(tmp_path / "a.mkv", audio=["eng", "jpn"], subtitles=[])
     (tmp_path / "broken.mkv").write_text("not a video")
     answer(monkeypatch, "1", "y")
@@ -222,13 +252,25 @@ def test_ctrl_c_during_a_mux_removes_the_half_written_file(tmp_path, monkeypatch
 
 
 def identify(*tracks):
-    entries = [{"id": index, "type": kind, "properties": properties} for index, (kind, properties) in enumerate(tracks)]
-    return json.dumps({"container": {"recognized": True}, "errors": [], "tracks": entries})
+    entries = [
+        {"id": index, "type": kind, "properties": properties}
+        for index, (kind, properties) in enumerate(tracks)
+    ]
+    return json.dumps(
+        {"container": {"recognized": True}, "errors": [], "tracks": entries}
+    )
 
 
 def test_a_language_with_and_without_its_ietf_tag_is_one_choice():
-    tagged = mkv.FileScan(None, mkv.parse_tracks(identify(("audio", {"language": "rus", "language_ietf": "ru"}))))
-    untagged = mkv.FileScan(None, mkv.parse_tracks(identify(("audio", {"language": "rus"}))))
+    tagged = mkv.FileScan(
+        None,
+        mkv.parse_tracks(
+            identify(("audio", {"language": "rus", "language_ietf": "ru"}))
+        ),
+    )
+    untagged = mkv.FileScan(
+        None, mkv.parse_tracks(identify(("audio", {"language": "rus"})))
+    )
 
     union = mkv.union_of([tagged, untagged])
 
@@ -249,7 +291,10 @@ def test_only_supported_subtitle_languages_are_offered():
         ),
     )
 
-    assert mkv.union_of([scan]) == [mkv.Selection(mkv.AUDIO, "fre"), mkv.Selection(mkv.SUBTITLES, "eng")]
+    assert mkv.union_of([scan]) == [
+        mkv.Selection(mkv.AUDIO, "fre"),
+        mkv.Selection(mkv.SUBTITLES, "eng"),
+    ]
 
 
 def test_a_track_without_a_language_counts_as_undetermined():
@@ -261,7 +306,10 @@ def test_a_track_without_a_language_counts_as_undetermined():
 def test_progress_is_read_from_carriage_return_updates():
     seen = []
 
-    messages = mkv.read_progress(iter(["mkvmerge v102.0\n", "Progress: 40%\rProgress: 100%\rDone.\n"]), seen.append)
+    messages = mkv.read_progress(
+        iter(["mkvmerge v102.0\n", "Progress: 40%\rProgress: 100%\rDone.\n"]),
+        seen.append,
+    )
 
     assert seen == [40, 100]
     assert messages == ["mkvmerge v102.0", "Done."]
@@ -270,7 +318,10 @@ def test_progress_is_read_from_carriage_return_updates():
 @pytest.mark.parametrize(
     ("messages", "expected"),
     [
-        (["mkvmerge v102.0", "Error: no space left", "Multiplexing took 1 second."], "Error: no space left"),
+        (
+            ["mkvmerge v102.0", "Error: no space left", "Multiplexing took 1 second."],
+            "Error: no space left",
+        ),
         (["mkvmerge v102.0", "something went wrong"], "something went wrong"),
         ([], "mkvmerge exited 2"),
     ],
@@ -314,14 +365,18 @@ def test_a_missing_directory_is_an_error(tmp_path, capsys):
 
 
 @needs_tools
-def test_the_result_lists_every_file_with_a_total(tmp_path, monkeypatch, capsys, notifications):
+def test_the_result_lists_every_file_with_a_total(
+    tmp_path, monkeypatch, capsys, notifications
+):
     make_mkv(tmp_path / "a.mkv", audio=["eng", "jpn"], subtitles=[])
     make_mkv(tmp_path / "b.mkv", audio=["eng", "jpn"], subtitles=[])
     answer(monkeypatch, "1", "y")
 
     mkv.main([str(tmp_path)])
 
-    first_cells = [line.strip("│ ").split(" ")[0] for line in capsys.readouterr().out.splitlines()]
+    first_cells = [
+        line.strip("│ ").split(" ")[0] for line in capsys.readouterr().out.splitlines()
+    ]
     assert {"a.mkv", "b.mkv", "total"} <= set(first_cells)
     assert len(notifications) == 1
     assert notifications[0].startswith("done - 2 files stripped, saved ")
