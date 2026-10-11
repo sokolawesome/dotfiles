@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SOURCE_FILE = ".source"
@@ -42,20 +42,26 @@ def toml_string(value: str) -> str:
 
 def render_torrent(torrent: dict[str, str]) -> str:
     lines = [TORRENT_HEADER]
-    lines += [f"{key} = {toml_string(value)}" for key, value in torrent.items() if value]
+    lines += [
+        f"{key} = {toml_string(value)}" for key, value in torrent.items() if value
+    ]
     return "\n".join(lines) + "\n"
 
 
 def folders_to_mark(root: Path) -> list[Path]:
     video_folders = {
-        path.parent for path in root.rglob("*") if path.suffix.lower() in VIDEO_SUFFIXES and path.is_file()
+        path.parent
+        for path in root.rglob("*")
+        if path.suffix.lower() in VIDEO_SUFFIXES and path.is_file()
     }
     return [root, *sorted(video_folders - {root})]
 
 
 def holds_only(folder: Path, video: Path) -> bool:
     others = (entry for entry in folder.iterdir() if entry != video)
-    return not any(entry.is_dir() or entry.suffix.lower() in VIDEO_SUFFIXES for entry in others)
+    return not any(
+        entry.is_dir() or entry.suffix.lower() in VIDEO_SUFFIXES for entry in others
+    )
 
 
 def write_torrent(folder: Path, torrent: dict[str, str]) -> str:
@@ -99,7 +105,9 @@ def magnet(info_hash: str, name: str, size: int, tracker: str) -> str:
         parameters.append(("xl", str(size)))
     if tracker:
         parameters.append(("tr", tracker))
-    return "magnet:?" + urllib.parse.urlencode(parameters, safe=":", quote_via=urllib.parse.quote)
+    return "magnet:?" + urllib.parse.urlencode(
+        parameters, safe=":", quote_via=urllib.parse.quote
+    )
 
 
 def run(args: Arguments) -> int:
@@ -111,7 +119,7 @@ def run(args: Arguments) -> int:
         "category": args.category,
         "tags": args.tags,
         "comment": args.comment,
-        "finished": datetime.now(timezone.utc).astimezone().strftime(TIME_FORMAT),
+        "finished": datetime.now(UTC).astimezone().strftime(TIME_FORMAT),
     }
     results = save(Path(args.path), torrent)
     for result, path in results:
