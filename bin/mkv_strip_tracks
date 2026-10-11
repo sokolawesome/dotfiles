@@ -2,17 +2,12 @@
 """Strip audio and subtitle tracks from MKV files."""
 
 import argparse
-import json
 import os
-import re
-import shutil
-import subprocess
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from rich.markup import escape
-from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
@@ -26,33 +21,34 @@ from _common import (
     run_cli,
     show_panel,
 )
-from _prompts import Option, choose_many, confirm
+from _mkv import (
+    AUDIO,
+    MKV_SUFFIX,
+    SELECTABLE_TYPES,
+    SUBTITLES,
+    FileScan,
+    MkvError,
+    Selection,
+    Track,
+    choose_interactively,
+    describe_missing,
+    find_tool,
+    format_size,
+    matches_for,
+    probe_all,
+    progress_bars,
+    report_unreadable,
+    resolve_picks,
+    run_with_progress,
+    scan_files,
+    size_of,
+    union_of,
+)
+from _prompts import confirm
 
-MKV_SUFFIX = ".mkv"
 TEMP_SUFFIX = ".stripping"
-PROGRESS_LINE = re.compile(r"Progress:\s*(\d+)%")
-AUDIO = "audio"
-SUBTITLES = "subtitles"
-SELECTABLE_TYPES = (AUDIO, SUBTITLES)
 MKVMERGE_FLAGS = {AUDIO: "--audio-tracks", SUBTITLES: "--subtitle-tracks"}
 MKVMERGE_DROP_FLAGS = {AUDIO: "--no-audio", SUBTITLES: "--no-subtitles"}
-MKVMERGE_FAILED = 2
-MEBIBYTE = 1024**2
-GIBIBYTE = 1024**3
-SUPPORTED_SUBTITLE_LANGUAGES = (
-    "en",
-    "eng",
-    "ja",
-    "jpn",
-    "ru",
-    "rus",
-    "es",
-    "spa",
-)
-
-
-class StripError(Exception):
-    pass
 
 
 @dataclass(frozen=True)
@@ -65,40 +61,6 @@ class StripResult:
     @property
     def saved(self) -> int:
         return self.before - self.after
-
-
-@dataclass(frozen=True)
-class Track:
-    kind: str
-    track_id: int
-    language: str
-    alias: str
-    name: str
-    codec: str
-
-    @property
-    def label(self) -> str:
-        return self.name or "unnamed"
-
-    def speaks(self, wanted: str) -> bool:
-        return wanted in (self.language, self.alias)
-
-
-@dataclass(frozen=True)
-class FileScan:
-    path: Path
-    tracks: tuple[Track, ...]
-    error: str = ""
-
-    @property
-    def readable(self) -> bool:
-        return not self.error
-
-
-@dataclass(frozen=True)
-class Selection:
-    kind: str
-    language: str
 
 
 @dataclass(frozen=True)
@@ -125,184 +87,6 @@ class FilePlan:
         )
 
 
-def find_mkvmerge() -> str:
-    found = shutil.which("mkvmerge")
-    if found is None:
-        raise StripError(
-            "mkvmerge not found, install with 'sudo pacman -S mkvtoolnix-cli'"
-        )
-    return found
-
-
-def language_of(properties: dict) -> tuple[str, str]:
-    ietf = (properties.get("language_ietf") or "").strip()
-    full = (properties.get("language") or "").strip()
-    if not ietf and not full:
-        return ("und", "und")
-    if not full:
-        full = ietf
-    if not ietf:
-        ietf = full
-    return (full.lower(), ietf.lower())
-
-
-def parse_tracks(payload: str) -> tuple[Track, ...]:
-    document = json.loads(payload)
-    errors = document.get("errors") or []
-    if errors:
-        raise ValueError(errors[0].strip())
-    if not document.get("container", {}).get("recognized"):
-        raise ValueError("not a recognized media file")
-    tracks = []
-    for entry in document.get("tracks", []):
-        properties = entry.get("properties", {})
-        language, alias = language_of(properties)
-        tracks.append(
-            Track(
-                kind=entry.get("type", ""),
-                track_id=int(entry.get("id", -1)),
-                language=language,
-                alias=alias,
-                name=(properties.get("track_name") or "").replace("|", "/"),
-                codec=properties.get("codec_id", ""),
-            )
-        )
-    return tuple(tracks)
-
-
-def probe(path: Path, mkvmerge: str) -> FileScan:
-    finished = subprocess.run(
-        [mkvmerge, "-J", str(path)], capture_output=True, text=True, check=False
-    )
-    try:
-        return FileScan(path, parse_tracks(finished.stdout))
-    except (json.JSONDecodeError, TypeError, ValueError) as error:
-        return FileScan(path, (), str(error) or f"mkvmerge exited {finished.returncode}")
-
-
-def scan_files(directory: Path) -> list[Path]:
-    if not directory.is_dir():
-        raise StripError(f"not a directory: {directory}")
-    return [
-        p
-        for p in sorted(directory.iterdir())
-        if p.is_file() and p.suffix.lower() == MKV_SUFFIX
-    ]
-
-
-def supported_subtitle(track: Track) -> bool:
-    return (
-        track.language in SUPPORTED_SUBTITLE_LANGUAGES
-        or track.alias in SUPPORTED_SUBTITLE_LANGUAGES
-    )
-
-
-def selectable(track: Track) -> bool:
-    if track.kind == AUDIO:
-        return True
-    return track.kind == SUBTITLES and supported_subtitle(track)
-
-
-def union_of(scans: list[FileScan]) -> list[Selection]:
-    keys: dict[tuple[str, str], None] = {}
-    for scan in scans:
-        for track in scan.tracks:
-            if selectable(track):
-                keys.setdefault((track.kind, track.language), None)
-    return [Selection(*key) for key in keys]
-
-
-def matches_for(selection: Selection, scan: FileScan) -> list[Track]:
-    return [
-        track
-        for track in scan.tracks
-        if track.kind == selection.kind and track.speaks(selection.language)
-    ]
-
-
-def presence_of(selection: Selection, scans: list[FileScan]) -> int:
-    return sum(1 for scan in scans if matches_for(selection, scan))
-
-
-def labels_for(selection: Selection, scans: list[FileScan]) -> list[str]:
-    labels = []
-    for scan in scans:
-        for track in matches_for(selection, scan):
-            if track.label not in labels:
-                labels.append(track.label)
-    return labels
-
-
-def choose_interactively(
-    scans: list[FileScan], union: list[Selection]
-) -> list[Selection]:
-    options = [
-        Option(
-            selection,
-            (
-                selection.kind,
-                selection.language,
-                ", ".join(labels_for(selection, scans)) or "unnamed",
-            ),
-            plural(presence_of(selection, scans), "file"),
-        )
-        for selection in union
-    ]
-    return choose_many("keep which tracks", options)
-
-
-def resolve_picks(
-    selections: list[Selection],
-    scan: FileScan,
-    ask: bool,
-) -> list[Track]:
-    chosen = []
-    for selection in selections:
-        candidates = matches_for(selection, scan)
-        if not candidates:
-            if ask:
-                chosen.extend(pick_from_available(selection, scan))
-            continue
-        if len(candidates) > 1 and ask:
-            chosen.extend(pick_from_candidates(selection, scan, candidates))
-        else:
-            chosen.extend(candidates)
-    unique = []
-    seen = set()
-    for track in chosen:
-        if track.track_id not in seen:
-            seen.add(track.track_id)
-            unique.append(track)
-    return unique
-
-
-def pick_from_candidates(
-    selection: Selection, scan: FileScan, candidates: list[Track]
-) -> list[Track]:
-    options = [Option(track, (track.label,), track.codec) for track in candidates]
-    return choose_many(
-        f"{scan.path.name}: {len(candidates)} {selection.kind} tracks in {selection.language}",
-        options,
-        candidates,
-        required=True,
-        border="failure",
-    )
-
-
-def pick_from_available(selection: Selection, scan: FileScan) -> list[Track]:
-    available = [track for track in scan.tracks if track.kind == selection.kind]
-    if not available:
-        return []
-    options = [
-        Option(track, (track.language, track.label), track.codec) for track in available
-    ]
-    return choose_many(
-        f"{scan.path.name}: no {selection.language} {selection.kind}, pick a replacement",
-        options,
-        border="failure",
-    )
-
-
 def build_plan(
     scans: list[FileScan], selections: list[Selection], ask: bool
 ) -> list[FilePlan]:
@@ -313,12 +97,6 @@ def build_plan(
         missing = tuple(s for s in selections if not matches_for(s, scan))
         plans.append(FilePlan(scan.path, tuple(keep), missing, kinds, scan.tracks))
     return plans
-
-
-def line_buffered(command: list[str]) -> list[str]:
-    if shutil.which("stdbuf"):
-        return ["stdbuf", "-oL", *command]
-    return command
 
 
 def strip_command(plan: FilePlan, mkvmerge: str) -> list[str]:
@@ -333,78 +111,24 @@ def strip_command(plan: FilePlan, mkvmerge: str) -> list[str]:
     return command
 
 
-def read_progress(stream: Iterable[str], report: Callable[[int], object]) -> list[str]:
-    messages = []
-    for line in stream:
-        for chunk in line.replace("\r", "\n").split("\n"):
-            match = PROGRESS_LINE.search(chunk)
-            if match:
-                report(int(match.group(1)))
-            elif chunk.strip():
-                messages.append(chunk.strip())
-    return messages
-
-
-def failure_reason(messages: list[str], code: int) -> str:
-    errors = [message for message in messages if message.startswith("Error")]
-    if errors:
-        return errors[0]
-    if messages:
-        return messages[-1]
-    return f"mkvmerge exited {code}"
-
-
-def strip_one(plan: FilePlan, mkvmerge: str, report: Callable[[int], object] | None = None) -> tuple[bool, str]:
+def strip_one(
+    plan: FilePlan, mkvmerge: str, report: Callable[[int], object] | None = None
+) -> tuple[bool, str]:
     temp = plan.temp_path
-    command = line_buffered(strip_command(plan, mkvmerge))
     try:
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
+        failure = run_with_progress(strip_command(plan, mkvmerge), report)
     except OSError as error:
         return False, str(error)
-    with process:
-        try:
-            messages = read_progress(process.stdout or [], report or (lambda percent: None))
-            code = process.wait()
-        except BaseException:
-            process.kill()
-            process.wait()
-            temp.unlink(missing_ok=True)
-            raise
-    if code >= MKVMERGE_FAILED:
+    except BaseException:
         temp.unlink(missing_ok=True)
-        return False, failure_reason(messages, code)
+        raise
+    if failure:
+        temp.unlink(missing_ok=True)
+        return False, failure
     if not temp.is_file():
         return False, "mkvmerge produced no output file"
     os.replace(temp, plan.path)
     return True, ""
-
-
-def size_of(path: Path) -> int:
-    try:
-        return path.stat().st_size
-    except OSError:
-        return 0
-
-
-def format_size(value: int) -> str:
-    if value < 0:
-        return f"-{format_size(-value)}"
-    if value >= GIBIBYTE:
-        return f"{value / GIBIBYTE:.2f} GiB"
-    if value >= MEBIBYTE:
-        return f"{value / MEBIBYTE:.2f} MiB"
-    return f"{value} B"
-
-
-def describe_missing(plan: FilePlan) -> str:
-    parts = [f"{s.kind[:3]} {s.language}" for s in plan.missing]
-    return ", ".join(parts)
 
 
 def track_summary(tracks: list[Track]) -> str:
@@ -435,7 +159,7 @@ def build_plan_table(plans: list[FilePlan]) -> Table:
         if first.kinds and not first.changes_file:
             note = "[dim]nothing to strip[/]"
         elif first.missing:
-            note = f"[dim]missing: {escape(describe_missing(first))}[/]"
+            note = f"[dim]missing: {escape(describe_missing(first.missing))}[/]"
         else:
             note = "[dim]clean[/]"
         table.add_row(
@@ -444,31 +168,9 @@ def build_plan_table(plans: list[FilePlan]) -> Table:
     return table
 
 
-def build_problem_table(scans: list[FileScan]) -> Table:
-    table = plain_table()
-    table.add_column(overflow="ellipsis")
-    table.add_column(overflow="fold")
-    for scan in scans:
-        if scan.error:
-            table.add_row(escape(scan.path.name), f"[failure]{escape(scan.error)}[/]")
-    return table
-
-
-def report_unreadable(scans: list[FileScan]) -> None:
-    if any(not scan.readable for scan in scans):
-        show_panel(build_problem_table(scans), "unreadable", "failure")
-
-
 def strip_all(plans: list[FilePlan], mkvmerge: str) -> list[StripResult]:
     results = []
-    with Progress(
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(complete_style="success", style="dim", finished_style="success"),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        console=console,
-        transient=True,
-    ) as progress:
+    with progress_bars() as progress:
         overall = (
             None
             if len(plans) == 1
@@ -490,7 +192,9 @@ def strip_all(plans: list[FilePlan], mkvmerge: str) -> list[StripResult]:
                     f"[failure]x[/] {escape(plan.path.name)}: {escape(detail)}"
                 )
             results.append(
-                StripResult(plan.path, before, size_of(plan.path) if ok else before, detail)
+                StripResult(
+                    plan.path, before, size_of(plan.path) if ok else before, detail
+                )
             )
             if overall is not None:
                 progress.advance(overall)
@@ -506,7 +210,10 @@ def build_result_table(results: list[StripResult]) -> Table:
     for result in results:
         if result.error:
             table.add_row(
-                escape(result.path.name), format_size(result.before), "[failure]failed[/]", ""
+                escape(result.path.name),
+                format_size(result.before),
+                "[failure]failed[/]",
+                "",
             )
         else:
             table.add_row(
@@ -526,15 +233,6 @@ def build_result_table(results: list[StripResult]) -> Table:
     return table
 
 
-def probe_all(paths: list[Path], mkvmerge: str) -> list[FileScan]:
-    scans = []
-    with console.status("probing") as status:
-        for index, path in enumerate(paths, start=1):
-            status.update(f"probing {index}/{len(paths)} [dim]{escape(path.name)}[/]")
-            scans.append(probe(path, mkvmerge))
-    return scans
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mkv_strip_tracks",
@@ -552,9 +250,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     try:
-        mkvmerge = find_mkvmerge()
+        mkvmerge = find_tool("mkvmerge")
         paths = scan_files(args.directory)
-    except StripError as error:
+    except MkvError as error:
         print_error(str(error))
         return 1
 
@@ -573,7 +271,7 @@ def main(argv: list[str] | None = None) -> int:
         print_error("no audio or supported subtitle tracks found")
         return 1
 
-    selections = choose_interactively(readable, union)
+    selections = choose_interactively("keep which tracks", readable, union)
     if not selections:
         console.print("[warning]nothing selected[/]")
         return 0
