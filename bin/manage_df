@@ -24,7 +24,7 @@ from _prompts import Option, choose_many
 PACKAGES = {
     "home": Path.home(),
     "config": Path.home() / ".config",
-    "bin": Path.home() / "bin",
+    "bin": Path.home() / ".local" / "bin",
     "agents": Path.home() / ".agents",
     "claude": Path.home() / ".claude",
 }
@@ -102,7 +102,12 @@ def run_package(source: Path, package: str, action: Action, verbose: bool) -> Re
         if action.links:
             target.mkdir(parents=True)
         elif action.simulated:
-            return Result(package, target, "done", f"MKDIR: {target}, then link everything in {package}")
+            return Result(
+                package,
+                target,
+                "done",
+                f"MKDIR: {target}, then link everything in {package}",
+            )
         else:
             return Result(package, target, "done")
     command = stow_command(action, source, target, package, verbose)

@@ -3,7 +3,7 @@ set -gx STARSHIP_CONFIG ~/.config/starship/starship.toml
 set -gx MANPAGER "bat -plman"
 set -gx DOTFILES_PATH ~/dotfiles
 
-fish_add_path -g ~/bin ~/go/bin /usr/local/go/bin
+fish_add_path -g ~/.local/bin ~/go/bin /usr/local/go/bin
 set -g fish_greeting
 
 status is-interactive || return

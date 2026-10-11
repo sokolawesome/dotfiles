@@ -20,7 +20,7 @@ def repo(tmp_path, monkeypatch):
     (source / "config" / "app").mkdir(parents=True)
     (source / "config" / "app" / "settings.toml").write_text("settings")
     targets = {
-        "bin": tmp_path / "home" / "bin",
+        "bin": tmp_path / "home" / ".local" / "bin",
         "config": tmp_path / "home" / ".config",
     }
     monkeypatch.setattr(manage_df, "PACKAGES", targets)
