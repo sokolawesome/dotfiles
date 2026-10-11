@@ -116,6 +116,17 @@
       "light": "Noctalia Light",
       "dark": "Noctalia Dark",
     },
+    "lsp": {
+      "lua-language-server": {
+        "settings": {
+          "Lua": {
+            "workspace": {
+              "library": ["/usr/share/hypr/stubs"],
+            },
+          },
+        },
+      },
+    },
   },
   "inlay_hints": {
     "enabled": true
@@ -137,15 +148,9 @@
           "command": "fish_indent"
         }
       }
-    }
-  },
-  "lsp": {
-    "basedpyright": {
-      "settings": {
-        "basedpyright.analysis": {
-          "typeCheckingMode": "standard"
-        }
-      }
+    },
+    "Python": {
+      "language_servers": ["ty", "ruff", "!basedpyright", "!pyright", "!pylsp", "..."]
     }
   },
 }
