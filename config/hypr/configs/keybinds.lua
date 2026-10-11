@@ -79,5 +79,4 @@ hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tru
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
 
 -- screenshots
-hl.bind(mainMod .. " + S", hl.dsp.exec_cmd([[bash -c 'region=$(slurp); sleep 0.25; [ -n "$region" ] && grim -g "$region" - | wl-copy']]))
-hl.bind(mainMod .. " + CTRL + S", hl.dsp.exec_cmd([[bash -c 'region=$(slurp); sleep 0.25; [ -n "$region" ] && grim -g "$region" - | swappy -f -']]))
+hl.bind(mainMod .. " + S", hl.dsp.exec_cmd([[noctalia msg screenshot-region]]))
