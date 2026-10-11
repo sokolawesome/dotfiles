@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+"""Extract audio and subtitle tracks from MKV files into files next to them."""
+
+import argparse
+import os
+import re
+import shutil
+from collections import Counter
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from pathlib import Path
+
+from rich.markup import escape
+from rich.table import Table
+from rich_argparse import RichHelpFormatter
+
+from _common import (
+    console,
+    notify,
+    plain_table,
+    plural,
+    print_cancelled,
+    print_error,
+    run_cli,
+    show_panel,
+)
+from _mkv import (
+    FileScan,
+    MkvError,
+    Selection,
+    Track,
+    choose_interactively,
+    describe_missing,
+    find_tool,
+    format_size,
+    matches_for,
+    probe_all,
+    progress_bars,
+    report_unreadable,
+    resolve_picks,
+    run_with_progress,
+    scan_files,
+    size_of,
+    union_of,
+)
+from _prompts import Option, ask_text, choose_many, choose_one, confirm
+
+TEMP_SUFFIX = ".extracting"
+UNSAFE_IN_NAMES = re.compile(r"[/\x00]")
+SKIP = "skip"
+OVERWRITE = "overwrite"
+CANCEL = "cancel"
+EXTENSIONS = (
+    ("A_AAC", "aac"),
+    ("A_AC3", "ac3"),
+    ("A_EAC3", "eac3"),
+    ("A_DTS", "dts"),
+    ("A_FLAC", "flac"),
+    ("A_MPEG/L2", "mp2"),
+    ("A_MPEG/L3", "mp3"),
+    ("A_OPUS", "opus"),
+    ("A_VORBIS", "ogg"),
+    ("A_PCM", "wav"),
+    ("A_TRUEHD", "thd"),
+    ("A_MLP", "mlp"),
+    ("A_ALAC", "caf"),
+    ("A_TTA1", "tta"),
+    ("A_WAVPACK4", "wv"),
+    ("S_TEXT/UTF8", "srt"),
+    ("S_TEXT/ASCII", "srt"),
+    ("S_TEXT/ASS", "ass"),
+    ("S_ASS", "ass"),
+    ("S_TEXT/SSA", "ssa"),
+    ("S_SSA", "ssa"),
+    ("S_TEXT/WEBVTT", "vtt"),
+    ("S_TEXT/USF", "usf"),
+    ("S_HDMV/PGS", "sup"),
+    ("S_HDMV/TEXTST", "textst"),
+    ("S_VOBSUB", "sub"),
+    ("S_KATE", "ogg"),
+)
+FALLBACK_EXTENSION = "bin"
+
+
+@dataclass(frozen=True)
+class Output:
+    track: Track
+    path: Path
+
+
+@dataclass(frozen=True)
+class FilePlan:
+    path: Path
+    outputs: tuple[Output, ...]
+    missing: tuple[Selection, ...] = ()
+
+    @property
+    def temp_dir(self) -> Path:
+        return self.path.with_name(f".{self.path.stem}{TEMP_SUFFIX}")
+
+
+@dataclass(frozen=True)
+class ExtractResult:
+    path: Path
+    written: tuple[Path, ...]
+    error: str = ""
+
+    @property
+    def size(self) -> int:
+        return sum(size_of(path) for path in self.written)
+
+
+def extension_for(codec: str) -> str:
+    for prefix, extension in EXTENSIONS:
+        if codec.startswith(prefix):
+            return extension
+    return FALLBACK_EXTENSION
+
+
+def key_of(track: Track) -> tuple[str, str, str]:
+    return (track.kind, track.language, track.name)
+
+
+def name_problem(name: str) -> str | None:
+    if "/" in name:
+        return "a name can't contain '/'"
+    return None
+
+
+def ask_for_names(picked: list[list[Track]]) -> dict[tuple[str, str, str], str]:
+    counts = Counter(
+        key for tracks in picked for key in dict.fromkeys(map(key_of, tracks))
+    )
+    if not counts:
+        return {}
+    options = [
+        Option(key, (key[0], key[1], key[2] or "unnamed"), plural(count, "file"))
+        for key, count in counts.items()
+    ]
+    return {
+        key: ask_text(
+            f"new name for {key[0]} {key[1]} {key[2] or 'unnamed'}",
+            key[2],
+            check=name_problem,
+        )
+        for key in choose_many("rename which tracks", options)
+    }
+
+
+def output_path(movie: Path, track: Track, label: str, tagged: bool) -> Path:
+    parts = [movie.stem, track.language, UNSAFE_IN_NAMES.sub("-", label).strip()]
+    if tagged:
+        parts.append(str(track.track_id))
+    stem = ".".join(part for part in parts if part)
+    return movie.with_name(f"{stem}.{extension_for(track.codec)}")
+
+
+def outputs_for(
+    movie: Path, tracks: list[Track], names: dict[tuple[str, str, str], str]
+) -> tuple[Output, ...]:
+    labels = [names.get(key_of(track), track.name) for track in tracks]
+    plain = [
+        output_path(movie, track, label, False) for track, label in zip(tracks, labels)
+    ]
+    taken = Counter(plain)
+    return tuple(
+        Output(track, output_path(movie, track, label, taken[path] > 1))
+        for track, label, path in zip(tracks, labels, plain)
+    )
+
+
+def build_plan(
+    scans: list[FileScan],
+    selections: list[Selection],
+    picked: list[list[Track]],
+    names: dict[tuple[str, str, str], str],
+) -> list[FilePlan]:
+    return [
+        FilePlan(
+            scan.path,
+            outputs_for(scan.path, tracks, names),
+            tuple(s for s in selections if not matches_for(s, scan)),
+        )
+        for scan, tracks in zip(scans, picked)
+    ]
+
+
+def existing(plans: list[FilePlan]) -> list[Path]:
+    return [
+        output.path for plan in plans for output in plan.outputs if output.path.exists()
+    ]
+
+
+def without_existing(plans: list[FilePlan]) -> list[FilePlan]:
+    return [
+        replace(
+            plan,
+            outputs=tuple(o for o in plan.outputs if not o.path.exists()),
+        )
+        for plan in plans
+    ]
+
+
+def build_path_table(paths: list[Path]) -> Table:
+    table = plain_table()
+    table.add_column(overflow="fold")
+    for path in paths:
+        table.add_row(escape(path.name))
+    return table
+
+
+def ask_about_existing(paths: list[Path]) -> str:
+    show_panel(build_path_table(paths), "already there", "warning")
+    return choose_one(
+        f"{plural(len(paths), 'file')} already there",
+        [
+            Option(SKIP, ("skip them",)),
+            Option(OVERWRITE, ("overwrite them",)),
+            Option(CANCEL, ("cancel",)),
+        ],
+    )
+
+
+def build_plan_table(plans: list[FilePlan]) -> Table:
+    table = plain_table()
+    table.add_column(overflow="ellipsis", ratio=1, min_width=24)
+    table.add_column()
+    table.add_column(overflow="fold", ratio=1)
+    table.add_column()
+    for plan in plans:
+        heading = escape(plan.path.name)
+        if not plan.outputs:
+            table.add_row(heading, "", "[dim]nothing to extract[/]", "")
+        for output in plan.outputs:
+            note = "[warning]overwrite[/]" if output.path.exists() else ""
+            table.add_row(heading, output.track.kind, escape(output.path.name), note)
+            heading = ""
+        if plan.missing:
+            table.add_row(
+                "", "", f"[dim]missing: {escape(describe_missing(plan.missing))}[/]", ""
+            )
+    return table
+
+
+def extract_command(plan: FilePlan, mkvextract: str) -> list[str]:
+    return [
+        mkvextract,
+        str(plan.path),
+        "tracks",
+        *(
+            f"{output.track.track_id}:{plan.temp_dir / output.path.name}"
+            for output in plan.outputs
+        ),
+    ]
+
+
+def move_out(plan: FilePlan) -> tuple[Path, ...]:
+    absent = [
+        output.path.name
+        for output in plan.outputs
+        if not (plan.temp_dir / output.path.name).is_file()
+    ]
+    if absent:
+        raise MkvError(f"mkvextract did not write {', '.join(absent)}")
+    written = []
+    for produced in sorted(plan.temp_dir.iterdir()):
+        target = plan.path.with_name(produced.name)
+        os.replace(produced, target)
+        written.append(target)
+    return tuple(written)
+
+
+def extract_one(
+    plan: FilePlan, mkvextract: str, report: Callable[[int], object] | None = None
+) -> ExtractResult:
+    shutil.rmtree(plan.temp_dir, ignore_errors=True)
+    try:
+        plan.temp_dir.mkdir()
+        failure = run_with_progress(extract_command(plan, mkvextract), report)
+        if failure:
+            return ExtractResult(plan.path, (), failure)
+        return ExtractResult(plan.path, move_out(plan))
+    except (OSError, MkvError) as error:
+        return ExtractResult(plan.path, (), str(error))
+    finally:
+        shutil.rmtree(plan.temp_dir, ignore_errors=True)
+
+
+def extract_all(plans: list[FilePlan], mkvextract: str) -> list[ExtractResult]:
+    results = []
+    with progress_bars() as progress:
+        overall = (
+            None
+            if len(plans) == 1
+            else progress.add_task("extracting", total=len(plans))
+        )
+        for index, plan in enumerate(plans, start=1):
+            if overall is not None:
+                progress.update(overall, description=f"{index - 1}/{len(plans)}")
+            task = progress.add_task(escape(plan.path.name), total=100)
+            result = extract_one(
+                plan,
+                mkvextract,
+                lambda percent, task=task: progress.update(task, completed=percent),
+            )
+            progress.remove_task(task)
+            if result.error:
+                console.print(
+                    f"[failure]x[/] {escape(plan.path.name)}: {escape(result.error)}"
+                )
+            results.append(result)
+            if overall is not None:
+                progress.advance(overall)
+    return results
+
+
+def build_result_table(results: list[ExtractResult]) -> Table:
+    table = Table(box=None, pad_edge=False, show_edge=False, header_style="dim")
+    table.add_column("file", overflow="ellipsis", ratio=1)
+    table.add_column("tracks", justify="right")
+    table.add_column("size", justify="right", style="success")
+    for result in results:
+        if result.error:
+            table.add_row(escape(result.path.name), "[failure]failed[/]", "")
+        else:
+            table.add_row(
+                escape(result.path.name),
+                str(len(result.written)),
+                format_size(result.size),
+            )
+    if len(results) > 1:
+        table.add_section()
+        table.add_row(
+            "[bold]total[/]",
+            str(sum(len(result.written) for result in results)),
+            format_size(sum(result.size for result in results)),
+        )
+    return table
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="mkv_extract_tracks",
+        formatter_class=RichHelpFormatter,
+        description="extract audio and subtitle tracks from mkv files into files next to them",
+        epilog="pass a directory to scan it, defaults to the current one",
+    )
+    parser.add_argument(
+        "directory", nargs="?", type=Path, default=Path("."), help="directory to scan"
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    try:
+        mkvmerge = find_tool("mkvmerge")
+        mkvextract = find_tool("mkvextract")
+        paths = scan_files(args.directory)
+    except MkvError as error:
+        print_error(str(error))
+        return 1
+
+    if not paths:
+        print_error("no .mkv files found")
+        return 1
+
+    scans = probe_all(paths, mkvmerge)
+    report_unreadable(scans)
+    readable = [scan for scan in scans if scan.readable]
+    if not readable:
+        return 1
+
+    union = union_of(readable)
+    if not union:
+        print_error("no audio or supported subtitle tracks found")
+        return 1
+
+    selections = choose_interactively("extract which tracks", readable, union)
+    if not selections:
+        console.print("[warning]nothing selected[/]")
+        return 0
+
+    picked = [resolve_picks(selections, scan, True) for scan in readable]
+    names = ask_for_names(picked)
+    plans = build_plan(readable, selections, picked, names)
+
+    present = existing(plans)
+    if present:
+        decision = ask_about_existing(present)
+        if decision == CANCEL:
+            print_cancelled()
+            return 1
+        if decision == SKIP:
+            plans = without_existing(plans)
+
+    show_panel(build_plan_table(plans), "plan")
+
+    working = [plan for plan in plans if plan.outputs]
+    if not working:
+        console.print("[success]nothing to extract[/]")
+        return 0
+
+    tracks = sum(len(plan.outputs) for plan in working)
+    if not confirm(
+        f"extract {plural(tracks, 'track')} from {plural(len(working), 'file')}?"
+    ):
+        print_cancelled()
+        return 1
+
+    results = extract_all(working, mkvextract)
+    failures = sum(1 for result in results if result.error)
+    written = format_size(sum(result.size for result in results))
+
+    show_panel(build_result_table(results), "result")
+    if failures:
+        summary = f"done with {plural(failures, 'error')}"
+        console.print(f"[failure]{summary}[/]")
+    else:
+        summary = f"done - {plural(tracks, 'track')} extracted"
+        console.print(f"[success]{summary}[/], wrote {written}")
+    notify("mkv_extract_tracks", f"{summary}, wrote {written}")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    run_cli(main)
