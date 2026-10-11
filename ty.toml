@@ -1,0 +1,16 @@
+[environment]
+extra-paths = ["bin"]
+
+[src]
+include = [
+  "bin",
+  "bin/backup_system_state",
+  "bin/manage_df",
+  "bin/mkv_extract_tracks",
+  "bin/mkv_strip_tracks",
+  "bin/organize_media",
+  "bin/rename_episodes",
+  "bin/rename_manga",
+  "homelab/save_source",
+  "tests",
+]
