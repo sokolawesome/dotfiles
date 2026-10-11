@@ -32,7 +32,6 @@ gnome-keyring
 go
 golangci-lint
 goverlay
-grim
 gst-plugin-pipewire
 gtk4-layer-shell
 hyprland
@@ -103,7 +102,6 @@ reflector
 resvg
 ripgrep
 ruff
-slurp
 smartmontools
 socat
 sshfs
@@ -111,14 +109,15 @@ starship
 steam
 stow
 stylua
-swappy
 systemd-resolvconf
 tailscale
 telegram-desktop
 tree
 tree-sitter-cli
 ttf-iosevkaterm-nerd
+ty
 unzip
+uv
 wget
 wireguard-tools
 wireplumber
