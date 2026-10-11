@@ -1,1 +1,2 @@
 src = ["bin", "tests"]
+extend-include = ["bin/[!._]*", "homelab/[!.]*"]
