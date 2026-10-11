@@ -1,5 +1,6 @@
-import pytest
 import tomllib
+
+import pytest
 
 from conftest import HOMELAB, load_module
 

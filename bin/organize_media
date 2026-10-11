@@ -91,13 +91,17 @@ def parse_season_range(spec: str) -> list[str]:
 
 
 def check_title(title: str) -> None:
-    unsafe = sorted({character for character in title if character in UNSAFE_TITLE_CHARACTERS})
+    unsafe = sorted(
+        {character for character in title if character in UNSAFE_TITLE_CHARACTERS}
+    )
     if unsafe:
         raise OrganizeMediaError(
             f"title can't contain {' '.join(unsafe)}, the folder name breaks on windows and samba shares"
         )
     if YEAR_IN_TITLE.search(title):
-        raise OrganizeMediaError("leave the year out of the title, it has its own field")
+        raise OrganizeMediaError(
+            "leave the year out of the title, it has its own field"
+        )
 
 
 def check_year(year: str) -> None:
@@ -464,7 +468,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-n", "--name", help="title of the movie or show")
     parser.add_argument("-y", "--year", help="release year")
-    parser.add_argument("-i", "--id", help="tvdb ids: the show id, then one per season, like 111,222,333")
+    parser.add_argument(
+        "-i",
+        "--id",
+        help="tvdb ids: the show id, then one per season, like 111,222,333",
+    )
     parser.add_argument("-s", "--seasons", help="season number or range, shows only")
     parser.add_argument(
         "root",

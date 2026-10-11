@@ -185,7 +185,11 @@ def build_changes(rows: list[tuple[Artifact, Result]]) -> Table:
 
 
 def show_changes(rows: list[tuple[Artifact, Result]]) -> None:
-    updated = [(artifact, result) for artifact, result in rows if result.outcome is Outcome.UPDATED]
+    updated = [
+        (artifact, result)
+        for artifact, result in rows
+        if result.outcome is Outcome.UPDATED
+    ]
     if updated:
         show_panel(build_changes(updated), "changes", "changed")
 
