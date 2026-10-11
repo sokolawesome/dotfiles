@@ -1,14 +1,8 @@
-import io
-
 import pytest
 
-from conftest import load_module
+from conftest import answer, load_module
 
 rename_episodes = load_module("rename_episodes")
-
-
-def answer(monkeypatch, line):
-    monkeypatch.setattr("sys.stdin", io.StringIO(f"{line}\n"))
 
 
 def season_folder(tmp_path, *names, folder="Season 1"):

@@ -1,13 +1,8 @@
-import io
-
 import pytest
 
 import _renaming
 from _renaming import Rename
-
-
-def answer(monkeypatch, line):
-    monkeypatch.setattr("sys.stdin", io.StringIO(f"{line}\n"))
+from conftest import answer
 
 
 def files(directory):

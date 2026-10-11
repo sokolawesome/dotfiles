@@ -1,5 +1,6 @@
 import importlib.machinery
 import importlib.util
+import io
 import os
 import pathlib
 import sys
@@ -20,3 +21,9 @@ def load_module(name, directory=BIN):
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
     return module
+
+
+def answer(monkeypatch, *lines):
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines))
+    )

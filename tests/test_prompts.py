@@ -1,5 +1,3 @@
-import io
-
 import pytest
 from prompt_toolkit.application import create_app_session
 from prompt_toolkit.input import create_pipe_input
@@ -7,6 +5,7 @@ from prompt_toolkit.output import DummyOutput
 
 import _prompts
 from _prompts import Option, Picker
+from conftest import answer
 
 DOWN = "\x1b[B"
 UP = "\x1b[A"
@@ -26,12 +25,6 @@ def press(keys, picker):
         pipe.send_text(keys)
         with create_app_session(input=pipe, output=DummyOutput()):
             return picker.run()
-
-
-def answer(monkeypatch, *lines):
-    monkeypatch.setattr(
-        "sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines))
-    )
 
 
 def checkbox(checked=(), required=False):

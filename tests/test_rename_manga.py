@@ -1,14 +1,8 @@
-import io
-
 import pytest
 
-from conftest import load_module
+from conftest import answer, load_module
 
 rename_manga = load_module("rename_manga")
-
-
-def answer(monkeypatch, line):
-    monkeypatch.setattr("sys.stdin", io.StringIO(f"{line}\n"))
 
 
 def library(tmp_path, *names):

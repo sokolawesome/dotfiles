@@ -1,19 +1,11 @@
-import io
-
 import pytest
 
-from conftest import load_module
+from conftest import answer, load_module
 
 organize_media = load_module("organize_media")
 
 SHREK = "Shrek (2001) [tvdbid-12345]"
 BLUE_BOX = "Blue Box (2024) [tvdbid-429934]"
-
-
-def answer(monkeypatch, *lines):
-    monkeypatch.setattr(
-        "sys.stdin", io.StringIO("".join(f"{line}\n" for line in lines))
-    )
 
 
 def tree(root):
