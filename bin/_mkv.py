@@ -251,9 +251,12 @@ def resolve_picks(
 ) -> list[Track]:
     chosen = []
     for selection in selections:
-        if matches_for(selection, scan):
-            chosen.extend(picked_for(selection, scan))
-        elif ask:
+        picked = picked_for(selection, scan)
+        if picked or not ask:
+            chosen.extend(picked)
+        elif matches_for(selection, scan):
+            chosen.extend(pick_other_name(selection, scan))
+        else:
             chosen.extend(pick_from_available(selection, scan))
     unique = []
     seen = set()
@@ -262,6 +265,20 @@ def resolve_picks(
             seen.add(track.track_id)
             unique.append(track)
     return unique
+
+
+def pick_other_name(selection: Selection, scan: FileScan) -> list[Track]:
+    names = ", ".join(sorted(name or "unnamed" for name in selection.names or ()))
+    options = [
+        Option(track, (track.label,), track.codec)
+        for track in matches_for(selection, scan)
+    ]
+    return choose_many(
+        f"{scan.path.name}: no {names} in {selection.kind} {selection.language}, "
+        "pick a replacement",
+        options,
+        border="failure",
+    )
 
 
 def pick_from_available(selection: Selection, scan: FileScan) -> list[Track]:

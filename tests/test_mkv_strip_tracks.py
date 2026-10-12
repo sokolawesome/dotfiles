@@ -106,12 +106,27 @@ def test_each_file_keeps_the_picked_name_it_has(tmp_path, monkeypatch):
 
 
 @needs_tools
-def test_a_file_without_the_picked_name_is_shown_as_missing(
+def test_a_file_without_the_picked_name_asks_for_a_replacement(
+    tmp_path, monkeypatch, capsys
+):
+    full = make_mkv(tmp_path / "a.mkv", audio=[], subtitles=["eng:Full"])
+    other = make_mkv(tmp_path / "b.mkv", audio=[], subtitles=["eng:CC", "eng:Signs"])
+    answer(monkeypatch, "1", "1", "1", "y")
+
+    mkv.main([str(tmp_path)])
+
+    assert "b.mkv: no Full in subtitles eng" in capsys.readouterr().out
+    assert tracks_in(full) == [("subtitles", "eng", "Full")]
+    assert tracks_in(other) == [("subtitles", "eng", "CC")]
+
+
+@needs_tools
+def test_answering_none_for_a_missing_name_drops_that_language(
     tmp_path, monkeypatch, capsys
 ):
     make_mkv(tmp_path / "a.mkv", audio=[], subtitles=["eng:Full"])
     signs_only = make_mkv(tmp_path / "b.mkv", audio=[], subtitles=["eng:Signs"])
-    answer(monkeypatch, "1", "1", "y")
+    answer(monkeypatch, "1", "1", "none", "y")
 
     mkv.main([str(tmp_path)])
 
