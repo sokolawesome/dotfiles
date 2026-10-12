@@ -107,6 +107,15 @@ def test_typed_picks_refuse_none_when_an_answer_is_required(monkeypatch, capsys)
     assert capsys.readouterr().out.count("pick numbers between 1 and 3, or 'all'") == 2
 
 
+def test_typed_picks_refuse_an_empty_answer_when_nothing_is_ticked_and_an_answer_is_required(
+    monkeypatch, capsys
+):
+    answer(monkeypatch, "", "2")
+
+    assert _prompts.choose_many("pick", OPTIONS, required=True) == ["b"]
+    assert "pick numbers between 1 and 3, or 'all'" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize(
     ("typed", "picked"), [("2", "b"), ("audio eng", "b"), ("s", "c"), ("", "a")]
 )

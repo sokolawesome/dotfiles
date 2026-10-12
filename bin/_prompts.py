@@ -230,7 +230,9 @@ def numbered_table[T](options: Sequence[Option[T]]) -> Table:
 def typed_picks[T](
     options: Sequence[Option[T]], checked: set[int], required: bool
 ) -> list[int]:
-    shortcuts = {"all": list(range(len(options))), "": sorted(checked)}
+    shortcuts = {"all": list(range(len(options)))}
+    if checked or not required:
+        shortcuts[""] = sorted(checked)
     if not required:
         shortcuts["none"] = []
     words = ", ".join(f"'{word}'" for word in shortcuts if word)
