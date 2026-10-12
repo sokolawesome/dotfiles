@@ -170,6 +170,36 @@ def test_a_season_in_the_file_name_beats_the_folder(tmp_path, monkeypatch):
     assert list(files(folder)) == ["S02E07.mkv"]
 
 
+def test_files_with_their_own_seasons_need_no_season_in_the_folder(
+    tmp_path, monkeypatch, capsys
+):
+    folder = season_folder(
+        tmp_path,
+        "Show.S01E09.Pilot.Part.Two.1080p.mkv",
+        "Show.S02E01.Some.Title.WEB-DL.mkv",
+        "Show.s03.e04.mkv",
+        folder="Show Name",
+    )
+    answer(monkeypatch, "y")
+
+    code = rename_episodes.main([str(folder)])
+
+    assert code == 0
+    assert sorted(files(folder)) == ["S01E09.mkv", "S02E01.mkv", "S03E04.mkv"]
+    assert "detected season" not in capsys.readouterr().out
+
+
+def test_one_file_without_a_season_still_needs_the_folder_season(tmp_path, capsys):
+    folder = season_folder(
+        tmp_path, "Show.S01E01.mkv", "Show - 02.mkv", folder="Show Name"
+    )
+
+    code = rename_episodes.main([str(folder)])
+
+    assert code == 1
+    assert "could not detect season" in capsys.readouterr().out
+
+
 def test_no_season_anywhere_is_an_error(tmp_path, capsys):
     folder = season_folder(tmp_path, "Show - 05.mkv", folder="Show Name")
 

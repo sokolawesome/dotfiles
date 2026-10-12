@@ -173,6 +173,11 @@ def scan_media_files(directory: Path) -> list[Path]:
     return sorted(p for p in candidates if p.name.lower().endswith(MEDIA_SUFFIXES))
 
 
+def lacks_season(path: Path) -> bool:
+    parsed = match_number(path.name)
+    return parsed is not None and parsed[0] is None
+
+
 def resolve_season(argument: int | None, directory: Path) -> str | None:
     if argument is not None:
         return pad(argument, SEASON_WIDTH)
@@ -180,7 +185,7 @@ def resolve_season(argument: int | None, directory: Path) -> str | None:
 
 
 def classify(
-    paths: list[Path], season: str, episode_offset: int
+    paths: list[Path], season: str | None, episode_offset: int
 ) -> tuple[list[Rename], list[Path]]:
     episodes = []
     skipped = []
@@ -191,14 +196,13 @@ def classify(
             skipped.append(path)
             continue
         found_season, found_number = parsed
+        episode_season = found_season or season
         number = int(found_number) + episode_offset
-        if number < 1:
+        if episode_season is None or number < 1:
             skipped.append(path)
             continue
         episodes.append(
-            Rename(
-                path, f"S{found_season or season}E{pad(number, EPISODE_WIDTH)}{suffix}"
-            )
+            Rename(path, f"S{episode_season}E{pad(number, EPISODE_WIDTH)}{suffix}")
         )
     return episodes, skipped
 
@@ -217,7 +221,8 @@ def build_parser() -> argparse.ArgumentParser:
         "-s",
         "--season",
         type=int,
-        help="season number, detected from the directory name if absent",
+        help="season for files without one in their name, "
+        "detected from the directory name if absent",
     )
     parser.add_argument(
         "-o",
@@ -237,18 +242,22 @@ def main(argv: list[str] | None = None) -> int:
         print_error(f"{directory} is not a directory")
         return 1
 
-    season = resolve_season(args.season, directory)
-    if season is None:
-        print_error("could not detect season from the directory name")
-        console.print("[dim]       use -s/--season to specify[/]")
-        return 1
-    if args.season is None:
-        console.print(f"[question]detected season {season}[/] from directory name\n")
-
     paths = scan_media_files(directory)
     if not paths:
         print_error("no media files found")
         return 1
+
+    season = None
+    if any(lacks_season(path) for path in paths):
+        season = resolve_season(args.season, directory)
+        if season is None:
+            print_error("could not detect season from the directory name")
+            console.print("[dim]       use -s/--season to specify[/]")
+            return 1
+        if args.season is None:
+            console.print(
+                f"[question]detected season {season}[/] from directory name\n"
+            )
 
     episodes, skipped = classify(paths, season, args.offset)
     if not episodes:

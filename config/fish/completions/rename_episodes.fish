@@ -6,7 +6,7 @@ complete -c rename_episodes \
 
 complete -c rename_episodes \
     -s s -l season \
-    -x -d "season number, detected from the directory name if absent" \
+    -x -d "season for files without one in their name, detected from the directory name if absent" \
     -a "(seq 0 20)"
 
 complete -c rename_episodes \
