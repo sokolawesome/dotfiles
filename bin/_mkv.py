@@ -4,8 +4,9 @@ import json
 import re
 import shutil
 import subprocess
+from collections import Counter
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from rich.markup import escape
@@ -71,6 +72,7 @@ class FileScan:
 class Selection:
     kind: str
     language: str
+    names: frozenset[str] | None = None
 
 
 def find_tool(name: str) -> str:
@@ -179,17 +181,46 @@ def matches_for(selection: Selection, scan: FileScan) -> list[Track]:
     ]
 
 
+def picked_for(selection: Selection, scan: FileScan) -> list[Track]:
+    return [
+        track
+        for track in matches_for(selection, scan)
+        if selection.names is None or track.name in selection.names
+    ]
+
+
 def presence_of(selection: Selection, scans: list[FileScan]) -> int:
     return sum(1 for scan in scans if matches_for(selection, scan))
 
 
+def files_per_name(selection: Selection, scans: list[FileScan]) -> Counter[str]:
+    return Counter(
+        name
+        for scan in scans
+        for name in dict.fromkeys(track.name for track in matches_for(selection, scan))
+    )
+
+
 def labels_for(selection: Selection, scans: list[FileScan]) -> list[str]:
-    labels = []
-    for scan in scans:
-        for track in matches_for(selection, scan):
-            if track.label not in labels:
-                labels.append(track.label)
-    return labels
+    return [name or "unnamed" for name in files_per_name(selection, scans)]
+
+
+def narrowed_by_name(
+    title: str, selection: Selection, scans: list[FileScan]
+) -> Selection:
+    counts = files_per_name(selection, scans)
+    if len(counts) < 2:
+        return selection
+    options = [
+        Option(name, (name or "unnamed",), plural(count, "file"))
+        for name, count in counts.items()
+    ]
+    names = choose_many(
+        f"{title}: {selection.kind} {selection.language}",
+        options,
+        required=True,
+    )
+    return replace(selection, names=frozenset(names))
 
 
 def choose_interactively(
@@ -207,7 +238,10 @@ def choose_interactively(
         )
         for selection in union
     ]
-    return choose_many(title, options)
+    return [
+        narrowed_by_name(title, selection, scans)
+        for selection in choose_many(title, options)
+    ]
 
 
 def resolve_picks(
@@ -217,15 +251,10 @@ def resolve_picks(
 ) -> list[Track]:
     chosen = []
     for selection in selections:
-        candidates = matches_for(selection, scan)
-        if not candidates:
-            if ask:
-                chosen.extend(pick_from_available(selection, scan))
-            continue
-        if len(candidates) > 1 and ask:
-            chosen.extend(pick_from_candidates(selection, scan, candidates))
-        else:
-            chosen.extend(candidates)
+        if matches_for(selection, scan):
+            chosen.extend(picked_for(selection, scan))
+        elif ask:
+            chosen.extend(pick_from_available(selection, scan))
     unique = []
     seen = set()
     for track in chosen:
@@ -233,19 +262,6 @@ def resolve_picks(
             seen.add(track.track_id)
             unique.append(track)
     return unique
-
-
-def pick_from_candidates(
-    selection: Selection, scan: FileScan, candidates: list[Track]
-) -> list[Track]:
-    options = [Option(track, (track.label,), track.codec) for track in candidates]
-    return choose_many(
-        f"{scan.path.name}: {len(candidates)} {selection.kind} tracks in {selection.language}",
-        options,
-        candidates,
-        required=True,
-        border="failure",
-    )
 
 
 def pick_from_available(selection: Selection, scan: FileScan) -> list[Track]:

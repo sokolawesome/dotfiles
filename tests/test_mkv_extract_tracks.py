@@ -110,7 +110,7 @@ def test_skipping_every_track_has_nothing_to_extract(tmp_path, monkeypatch, caps
 @needs_tools
 def test_two_unnamed_tracks_in_one_language_get_their_ids(tmp_path, monkeypatch):
     make_mkv(tmp_path / "a.mkv", audio=["rus", "rus"], subtitles=[])
-    answer(monkeypatch, "1", "all", "", "y")
+    answer(monkeypatch, "1", "", "y")
 
     mkv.main([str(tmp_path)])
 

@@ -34,7 +34,7 @@ from _mkv import (
     describe_missing,
     find_tool,
     format_size,
-    matches_for,
+    picked_for,
     probe_all,
     progress_bars,
     report_unreadable,
@@ -94,7 +94,7 @@ def build_plan(
     plans = []
     for scan in scans:
         keep = resolve_picks(selections, scan, ask)
-        missing = tuple(s for s in selections if not matches_for(s, scan))
+        missing = tuple(s for s in selections if not picked_for(s, scan))
         plans.append(FilePlan(scan.path, tuple(keep), missing, kinds, scan.tracks))
     return plans
 

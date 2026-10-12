@@ -79,6 +79,47 @@ def test_two_tracks_in_one_language_ask_which_to_keep(tmp_path, monkeypatch):
 
 
 @needs_tools
+def test_a_track_name_is_picked_once_for_every_file(tmp_path, monkeypatch):
+    episodes = [
+        make_mkv(tmp_path / f"{n}.mkv", audio=[], subtitles=["eng:Full", "eng:CC"])
+        for n in (1, 2, 3)
+    ]
+    answer(monkeypatch, "1", "1", "y")
+
+    mkv.main([str(tmp_path)])
+
+    assert [tracks_in(episode) for episode in episodes] == [
+        [("subtitles", "eng", "Full")]
+    ] * 3
+
+
+@needs_tools
+def test_each_file_keeps_the_picked_name_it_has(tmp_path, monkeypatch):
+    named = make_mkv(tmp_path / "a.mkv", audio=[], subtitles=["eng:Full", "eng:Signs"])
+    unnamed = make_mkv(tmp_path / "b.mkv", audio=[], subtitles=["eng", "eng:Signs"])
+    answer(monkeypatch, "1", "1 3", "y")
+
+    mkv.main([str(tmp_path)])
+
+    assert tracks_in(named) == [("subtitles", "eng", "Full")]
+    assert tracks_in(unnamed) == [("subtitles", "eng", "")]
+
+
+@needs_tools
+def test_a_file_without_the_picked_name_is_shown_as_missing(
+    tmp_path, monkeypatch, capsys
+):
+    make_mkv(tmp_path / "a.mkv", audio=[], subtitles=["eng:Full"])
+    signs_only = make_mkv(tmp_path / "b.mkv", audio=[], subtitles=["eng:Signs"])
+    answer(monkeypatch, "1", "1", "y")
+
+    mkv.main([str(tmp_path)])
+
+    assert "missing: sub eng" in capsys.readouterr().out
+    assert tracks_in(signs_only) == []
+
+
+@needs_tools
 def test_a_file_that_already_has_only_the_picked_tracks_is_not_remuxed(
     tmp_path, monkeypatch, capsys
 ):
