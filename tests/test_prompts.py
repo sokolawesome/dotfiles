@@ -145,3 +145,32 @@ def test_typed_text_asks_until_the_check_passes(monkeypatch, capsys):
     assert answer_text == "42"
     assert "an answer is required" in out
     assert "digits only" in out
+
+
+@pytest.mark.parametrize(
+    ("typed", "agreed"), [("y", True), ("Yes", True), ("n", False)]
+)
+def test_typed_confirm_takes_yes_or_no(monkeypatch, typed, agreed):
+    answer(monkeypatch, typed)
+
+    assert _prompts.confirm("go?") is agreed
+
+
+def test_typed_confirm_asks_again_after_an_empty_answer(monkeypatch, capsys):
+    answer(monkeypatch, "", "maybe", "y")
+
+    agreed = _prompts.confirm("go?")
+
+    assert agreed is True
+    assert capsys.readouterr().out.count("answer y or n") == 2
+
+
+def test_enter_alone_does_not_answer_a_confirm(monkeypatch):
+    monkeypatch.setattr("_prompts.interactive", lambda: True)
+
+    with create_pipe_input() as pipe:
+        pipe.send_text(ENTER + "n" + ENTER)
+        with create_app_session(input=pipe, output=DummyOutput()):
+            agreed = _prompts.confirm("go?")
+
+    assert agreed is False

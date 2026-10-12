@@ -16,7 +16,7 @@ from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.styles import Style
 from prompt_toolkit.validation import ValidationError, Validator
 from rich.markup import escape
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 from rich.table import Table
 
 from _common import console, plain_table, show_panel
@@ -44,6 +44,8 @@ MULTIPLE_HELP = "↑↓ move · space toggle · a all · enter confirm"
 SINGLE_HELP = "↑↓ move · enter select"
 REQUIRED_WARNING = "pick at least one"
 REQUIRED_ANSWER = "an answer is required"
+CONFIRM_REQUIRED = "answer y or n"
+CONFIRM_ANSWERS = {"y": True, "yes": True, "n": False, "no": False}
 
 
 @dataclass(frozen=True)
@@ -360,6 +362,25 @@ def ask_text(
 
 
 def confirm(question: str) -> bool:
-    return Confirm.ask(
-        f"[question]{escape(question)}[/]", default=False, console=console
-    )
+    def problem(answer: str) -> str | None:
+        if answer.casefold() in CONFIRM_ANSWERS:
+            return None
+        return CONFIRM_REQUIRED
+
+    if interactive():
+        answer = prompt(
+            [("class:question", question), ("class:hint", " [y/n]"), ("", " ")],
+            validator=ProblemValidator(problem),
+            validate_while_typing=False,
+            style=STYLE,
+        )
+        return CONFIRM_ANSWERS[answer.strip().casefold()]
+
+    while True:
+        answer = Prompt.ask(
+            f"[question]{escape(question)}[/] [dim]\\[y/n][/]", console=console
+        ).strip()
+        message = problem(answer)
+        if not message:
+            return CONFIRM_ANSWERS[answer.casefold()]
+        console.print(f"[failure]{message}[/]")
