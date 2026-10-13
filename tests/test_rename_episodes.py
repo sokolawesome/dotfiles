@@ -84,6 +84,10 @@ def test_no_episode_number(name):
         ("S01E01.rus.720p.anilibria.ass", ".rus.ass"),
         ("S01E22.netflix.eng.ass", ".eng.ass"),
         ("S01E01.Netflix.rus.anilibria.ass", ".rus.anilibria.ass"),
+        ("S01E01.rus.Dream Cast.mka", ".rus.Dream Cast.mka"),
+        ("S01E01.rus.AniLibria-TV.mka", ".rus.AniLibria-TV.mka"),
+        ("S01E01.rus.Кубик в Кубе.mka", ".rus.Кубик в Кубе.mka"),
+        ("S01E01.rus.x264.mka", ".rus.mka"),
         ("Show.S01E01.Netflix.ass", ".ass"),
         ("notes.txt", ""),
         ("Show.S01E01", ""),
@@ -115,6 +119,24 @@ def test_kept_suffix(name, expected):
 )
 def test_season_from_the_folder_name(folder, expected):
     assert rename_episodes.detect_season(folder) == expected
+
+
+@pytest.mark.parametrize(
+    ("folders", "language", "name"),
+    [
+        (("RUS Sound", "AniLibria"), "rus", "AniLibria"),
+        (("Rus Subs [Crunchyroll]",), "rus", "Crunchyroll"),
+        (("ENG Subs", "Full"), "eng", "Full"),
+        (("Субтитры", "Русские"), "rus", ""),
+        (("Озвучка", "AniDUB"), "", "AniDUB"),
+        (("Dream Cast",), "", "Dream Cast"),
+        (("Subs",), "", ""),
+        ((), "", ""),
+    ],
+)
+def test_language_and_name_are_guessed_from_the_folders(folders, language, name):
+    assert rename_episodes.guess_language(folders) == language
+    assert rename_episodes.guess_name(folders) == name
 
 
 def test_renames_using_the_season_from_the_folder(tmp_path, monkeypatch, capsys):
@@ -305,3 +327,95 @@ def test_a_missing_directory_is_an_error(tmp_path, capsys):
 
     assert code == 1
     assert "is not a directory" in capsys.readouterr().out
+
+
+def test_tracks_in_subfolders_move_next_to_the_episodes(tmp_path, monkeypatch):
+    folder = season_folder(tmp_path, "Show - 05.mkv")
+    dubs = folder / "RUS Sound" / "AniLibria"
+    subs = folder / "RUS Subs"
+    dubs.mkdir(parents=True)
+    subs.mkdir()
+    (dubs / "Show - 05.mka").write_text("dub")
+    (subs / "Show - 05.ass").write_text("sub")
+    answer(monkeypatch, "", "", "", "Crunchyroll", "y")
+
+    code = rename_episodes.main([str(folder)])
+
+    assert code == 0
+    assert files(folder) == {
+        "S01E05.mkv": "Show - 05.mkv",
+        "S01E05.rus.AniLibria.mka": "dub",
+        "S01E05.rus.Crunchyroll.ass": "sub",
+    }
+    assert [path.name for path in folder.iterdir() if path.is_dir()] == []
+
+
+def test_untagged_tracks_next_to_the_episodes_ask_for_tags(tmp_path, monkeypatch):
+    folder = season_folder(tmp_path, "Show - 05.mkv", "Show - 05.mka")
+    answer(monkeypatch, "RUS", "Dream Cast", "y")
+
+    rename_episodes.main([str(folder)])
+
+    assert sorted(files(folder)) == ["S01E05.mkv", "S01E05.rus.Dream Cast.mka"]
+
+
+def test_dubs_and_subs_in_one_folder_get_their_own_tags(tmp_path, monkeypatch, capsys):
+    folder = season_folder(tmp_path, "Show - 05.mkv", "Show - 05.mka", "Show - 05.srt")
+    answer(monkeypatch, "rus", "AniLibria", "eng", "Crunchyroll", "y")
+
+    code = rename_episodes.main([str(folder)])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "language for audio in Season 1" in out
+    assert "language for subtitles in Season 1" in out
+    assert sorted(files(folder)) == [
+        "S01E05.eng.Crunchyroll.srt",
+        "S01E05.mkv",
+        "S01E05.rus.AniLibria.mka",
+    ]
+
+
+def test_a_track_name_can_be_left_out(tmp_path, monkeypatch):
+    folder = season_folder(tmp_path, "Show - 05.mkv", "Show - 05.srt")
+    answer(monkeypatch, "eng", "", "y")
+
+    rename_episodes.main([str(folder)])
+
+    assert sorted(files(folder)) == ["S01E05.eng.srt", "S01E05.mkv"]
+
+
+def test_an_unknown_language_or_bad_name_is_asked_again(tmp_path, monkeypatch, capsys):
+    folder = season_folder(tmp_path, "Show - 05.mka")
+    answer(monkeypatch, "xx", "rus", "2x2", "AniLibria", "y")
+
+    rename_episodes.main([str(folder)])
+
+    out = capsys.readouterr().out
+    assert "use one of" in out
+    assert "use letters" in out
+    assert list(files(folder)) == ["S01E05.rus.AniLibria.mka"]
+
+
+def test_tagged_tracks_in_subfolders_move_without_questions(tmp_path, monkeypatch):
+    folder = season_folder(tmp_path, "Show - 05.mkv")
+    (folder / "Subs").mkdir()
+    (folder / "Subs" / "Show - 05.rus.anilibria.ass").write_text("sub")
+    answer(monkeypatch, "y")
+
+    code = rename_episodes.main([str(folder)])
+
+    assert code == 0
+    assert sorted(files(folder)) == ["S01E05.mkv", "S01E05.rus.anilibria.ass"]
+
+
+def test_tracks_in_hidden_folders_are_ignored(tmp_path, monkeypatch):
+    folder = season_folder(tmp_path, "Show - 05.mkv")
+    (folder / ".Show - 05.extracting").mkdir()
+    (folder / ".Show - 05.extracting" / "Show - 05.mka").write_text("partial")
+    answer(monkeypatch, "y")
+
+    rename_episodes.main([str(folder)])
+
+    assert list(files(folder)) == ["S01E05.mkv"]
+    assert (folder / ".Show - 05.extracting" / "Show - 05.mka").exists()

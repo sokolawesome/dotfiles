@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bulk rename tv show episodes to S01E01 format."""
+"""Bulk rename tv show episodes and their dubs and subs to S01E01 format."""
 
 import argparse
 import re
@@ -9,6 +9,7 @@ from pathlib import Path
 from rich_argparse import RichHelpFormatter
 
 from _common import console, print_error, run_cli
+from _prompts import ask_text
 from _renaming import Rename, pad, rename_all
 
 SEASON_WIDTH = 2
@@ -17,7 +18,10 @@ EPISODE_WIDTH = 2
 VIDEO_SUFFIXES = (".mkv", ".mp4", ".avi")
 AUDIO_SUFFIXES = (".mka", ".ac3", ".eac3", ".flac", ".aac")
 SUBTITLE_SUFFIXES = (".ass", ".srt", ".vtt", ".sub")
-MEDIA_SUFFIXES = VIDEO_SUFFIXES + AUDIO_SUFFIXES + SUBTITLE_SUFFIXES
+TRACK_SUFFIXES = AUDIO_SUFFIXES + SUBTITLE_SUFFIXES
+AUDIO = "audio"
+SUBTITLES = "subtitles"
+MEDIA_SUFFIXES = VIDEO_SUFFIXES + TRACK_SUFFIXES
 
 LANGUAGE_CODES = (
     "en",
@@ -28,6 +32,49 @@ LANGUAGE_CODES = (
     "spa",
     "ja",
     "jpn",
+)
+
+LANGUAGE_WORDS = {
+    "ru": "rus",
+    "rus": "rus",
+    "russian": "rus",
+    "рус": "rus",
+    "русская": "rus",
+    "русские": "rus",
+    "русский": "rus",
+    "en": "eng",
+    "eng": "eng",
+    "english": "eng",
+    "англ": "eng",
+    "английская": "eng",
+    "английские": "eng",
+    "английский": "eng",
+    "es": "spa",
+    "spa": "spa",
+    "spanish": "spa",
+    "ja": "jpn",
+    "jp": "jpn",
+    "jap": "jpn",
+    "jpn": "jpn",
+    "japanese": "jpn",
+}
+TRACK_FOLDER_WORDS = (
+    "audio",
+    "dub",
+    "dubs",
+    "sound",
+    "sounds",
+    "voice",
+    "voices",
+    "sub",
+    "subs",
+    "subtitles",
+    "track",
+    "tracks",
+    "звук",
+    "озвучка",
+    "сабы",
+    "субтитры",
 )
 
 QUALITY_WORDS = (
@@ -66,11 +113,18 @@ TRAILING_NUMBER = re.compile(r"[ -]([0-9]{1,3})$")
 LEADING_NUMBER = re.compile(r"^([0-9]{1,3})[\. ]")
 MIDDLE_NUMBER = re.compile(r" ([0-9]{1,3}) ")
 
-ALPHA_SEGMENT = re.compile(r"^[A-Za-z]+$")
+NAME_SEGMENT = re.compile(r"^[^\W\d_]+(?:[ '&-]+[^\W\d_]+)*$")
+FOLDER_WORD = re.compile(r"[^\W_]+")
 
 SEASON_IN_NAME = re.compile(
     r"season[\s._-]*([0-9]+)|(?<![a-z0-9])s([0-9]{1,2})(?![0-9])", re.IGNORECASE
 )
+
+
+@dataclass(frozen=True, order=True)
+class TrackGroup:
+    folder: Path
+    kind: str
 
 
 @dataclass(frozen=True)
@@ -145,7 +199,7 @@ def trailing_tags(stem: str) -> str:
     if language is None:
         return ""
     last = language
-    while last + 1 < len(segments) and ALPHA_SEGMENT.match(segments[last + 1]):
+    while last + 1 < len(segments) and NAME_SEGMENT.match(segments[last + 1]):
         last += 1
     tags = [
         segment.lower() if index == language else segment
@@ -154,10 +208,59 @@ def trailing_tags(stem: str) -> str:
     return "." + ".".join(tags)
 
 
-def target_suffix(name: str) -> str:
+def media_suffix(name: str) -> str:
     for suffix in MEDIA_SUFFIXES:
         if name.lower().endswith(suffix):
-            return f"{trailing_tags(name[: -len(suffix)])}{suffix}"
+            return suffix
+    return ""
+
+
+def target_suffix(name: str) -> str:
+    suffix = media_suffix(name)
+    if not suffix:
+        return ""
+    return f"{trailing_tags(name[: -len(suffix)])}{suffix}"
+
+
+def untagged_track(path: Path) -> bool:
+    suffix = media_suffix(path.name)
+    return suffix in TRACK_SUFFIXES and not trailing_tags(path.name[: -len(suffix)])
+
+
+def language_problem(language: str) -> str | None:
+    if language.lower() in LANGUAGE_CODES:
+        return None
+    return f"use one of {', '.join(LANGUAGE_CODES)}"
+
+
+def name_problem(name: str) -> str | None:
+    if all(NAME_SEGMENT.match(segment) for segment in name.split(".")):
+        return None
+    return "use letters, spaces and - ' & between dots"
+
+
+def folder_words(folder: str) -> list[str]:
+    return FOLDER_WORD.findall(folder)
+
+
+def guess_language(folders: tuple[str, ...]) -> str:
+    for folder in reversed(folders):
+        for word in reversed(folder_words(folder)):
+            if word.lower() in LANGUAGE_WORDS:
+                return LANGUAGE_WORDS[word.lower()]
+    return ""
+
+
+def guess_name(folders: tuple[str, ...]) -> str:
+    for folder in reversed(folders):
+        words = [
+            word
+            for word in folder_words(folder)
+            if word.lower() not in LANGUAGE_WORDS
+            and word.lower() not in TRACK_FOLDER_WORDS
+        ]
+        if words:
+            return " ".join(words)
     return ""
 
 
@@ -173,6 +276,70 @@ def scan_media_files(directory: Path) -> list[Path]:
     return sorted(p for p in candidates if p.name.lower().endswith(MEDIA_SUFFIXES))
 
 
+def hidden(path: Path, directory: Path) -> bool:
+    return any(part.startswith(".") for part in path.relative_to(directory).parts)
+
+
+def scan_track_folders(directory: Path) -> list[Path]:
+    return sorted(
+        p
+        for p in directory.glob("*/**/*")
+        if p.is_file()
+        and p.name.lower().endswith(TRACK_SUFFIXES)
+        and not hidden(p, directory)
+    )
+
+
+def group_of(path: Path) -> TrackGroup:
+    kind = AUDIO if media_suffix(path.name) in AUDIO_SUFFIXES else SUBTITLES
+    return TrackGroup(path.parent, kind)
+
+
+def groups_to_tag(paths: list[Path]) -> list[TrackGroup]:
+    return sorted(
+        {
+            group_of(path)
+            for path in paths
+            if untagged_track(path) and match_number(path.name) is not None
+        }
+    )
+
+
+def folder_label(folder: Path, directory: Path) -> str:
+    if folder == directory:
+        return directory.resolve().name
+    return str(folder.relative_to(directory))
+
+
+def ask_tags(group: TrackGroup, directory: Path) -> str:
+    folders = group.folder.relative_to(directory).parts
+    label = f"{group.kind} in {folder_label(group.folder, directory)}"
+    language = ask_text(
+        f"language for {label}",
+        guess_language(folders),
+        LANGUAGE_CODES,
+        language_problem,
+    ).lower()
+    name = ask_text(
+        f"name for {label}",
+        guess_name(folders),
+        check=name_problem,
+        required=False,
+    )
+    return "".join(f".{tag}" for tag in (language, name) if tag)
+
+
+def ask_all_tags(paths: list[Path], directory: Path) -> dict[TrackGroup, str]:
+    return {group: ask_tags(group, directory) for group in groups_to_tag(paths)}
+
+
+def suffix_for(path: Path, tags: dict[TrackGroup, str]) -> str:
+    group = group_of(path)
+    if group in tags and untagged_track(path):
+        return f"{tags[group]}{media_suffix(path.name)}"
+    return target_suffix(path.name)
+
+
 def lacks_season(path: Path) -> bool:
     parsed = match_number(path.name)
     return parsed is not None and parsed[0] is None
@@ -185,13 +352,17 @@ def resolve_season(argument: int | None, directory: Path) -> str | None:
 
 
 def classify(
-    paths: list[Path], season: str | None, episode_offset: int
+    paths: list[Path],
+    season: str | None,
+    episode_offset: int,
+    directory: Path,
+    tags: dict[TrackGroup, str],
 ) -> tuple[list[Rename], list[Path]]:
     episodes = []
     skipped = []
     for path in paths:
         parsed = match_number(path.name)
-        suffix = target_suffix(path.name)
+        suffix = suffix_for(path, tags)
         if parsed is None or not suffix:
             skipped.append(path)
             continue
@@ -202,7 +373,11 @@ def classify(
             skipped.append(path)
             continue
         episodes.append(
-            Rename(path, f"S{episode_season}E{pad(number, EPISODE_WIDTH)}{suffix}")
+            Rename(
+                path,
+                f"S{episode_season}E{pad(number, EPISODE_WIDTH)}{suffix}",
+                directory,
+            )
         )
     return episodes, skipped
 
@@ -211,8 +386,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rename_episodes",
         formatter_class=RichHelpFormatter,
-        description="rename episode files to S01E01 format",
-        epilog="pass a directory to scan it, defaults to the current one",
+        description="rename episode files to S01E01 format, "
+        "dubs and subs to S01E01.lang.name.ext",
+        epilog="pass a directory to scan it, defaults to the current one. "
+        "dubs and subs in its subfolders move next to the episodes, "
+        "the language and name are asked for tracks without them",
     )
     parser.add_argument(
         "directory", nargs="?", type=Path, default=Path("."), help="directory to scan"
@@ -242,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
         print_error(f"{directory} is not a directory")
         return 1
 
-    paths = scan_media_files(directory)
+    paths = scan_media_files(directory) + scan_track_folders(directory)
     if not paths:
         print_error("no media files found")
         return 1
@@ -259,7 +437,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"[question]detected season {season}[/] from directory name\n"
             )
 
-    episodes, skipped = classify(paths, season, args.offset)
+    tags = ask_all_tags(paths, directory)
+    episodes, skipped = classify(paths, season, args.offset, directory, tags)
     if not episodes:
         print_error("could not extract episode numbers from any files")
         return 1
