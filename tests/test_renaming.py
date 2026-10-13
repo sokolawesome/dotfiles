@@ -18,10 +18,14 @@ def renames(directory, *pairs):
     return [Rename(directory / source, target) for source, target in pairs]
 
 
+def paths(directory, *names):
+    return {directory / name for name in names}
+
+
 def test_order_moves_the_highest_file_first_when_shifting_up(tmp_path):
     pending = renames(tmp_path, ("E1", "E2"), ("E2", "E3"))
 
-    ordered, blocked = _renaming.order_renames(pending, {"E1", "E2"})
+    ordered, blocked = _renaming.order_renames(pending, paths(tmp_path, "E1", "E2"))
 
     assert [rename.target for rename in ordered] == ["E3", "E2"]
     assert blocked == []
@@ -30,7 +34,7 @@ def test_order_moves_the_highest_file_first_when_shifting_up(tmp_path):
 def test_order_moves_the_lowest_file_first_when_shifting_down(tmp_path):
     pending = renames(tmp_path, ("E2", "E1"), ("E3", "E2"))
 
-    ordered, blocked = _renaming.order_renames(pending, {"E2", "E3"})
+    ordered, blocked = _renaming.order_renames(pending, paths(tmp_path, "E2", "E3"))
 
     assert [rename.target for rename in ordered] == ["E1", "E2"]
     assert blocked == []
@@ -39,7 +43,7 @@ def test_order_moves_the_lowest_file_first_when_shifting_down(tmp_path):
 def test_order_blocks_a_swap(tmp_path):
     pending = renames(tmp_path, ("a", "b"), ("b", "a"))
 
-    ordered, blocked = _renaming.order_renames(pending, {"a", "b"})
+    ordered, blocked = _renaming.order_renames(pending, paths(tmp_path, "a", "b"))
 
     assert ordered == []
     assert blocked == pending
@@ -200,3 +204,48 @@ def test_unticking_a_file_keeps_its_name_taken(tmp_path, monkeypatch, capsys):
     assert code == 1
     assert "two files resolve to the same name" in capsys.readouterr().out
     assert files(tmp_path) == {"S01E02.mkv": "a", "b.mkv": "b"}
+
+
+def test_rename_all_moves_files_into_the_destination(tmp_path, monkeypatch, capsys):
+    tracks = tmp_path / "RUS Sound" / "AniLibria"
+    tracks.mkdir(parents=True)
+    make(tracks, **{"Show - 05.mka": "dub"})
+    answer(monkeypatch, "y")
+
+    code = _renaming.rename_all(
+        tmp_path, [Rename(tracks / "Show - 05.mka", "S01E05.rus.mka", tmp_path)], []
+    )
+
+    assert code == 0
+    assert (
+        "RUS Sound/AniLibria/Show - 05.mka -> S01E05.rus.mka" in capsys.readouterr().out
+    )
+    assert files(tmp_path) == {"S01E05.rus.mka": "dub"}
+
+
+def test_rename_all_keeps_folders_that_still_hold_files(tmp_path, monkeypatch):
+    tracks = tmp_path / "Subs"
+    tracks.mkdir()
+    make(tracks, **{"Show - 05.ass": "sub", "notes.txt": "keep"})
+    answer(monkeypatch, "y")
+
+    _renaming.rename_all(
+        tmp_path, [Rename(tracks / "Show - 05.ass", "S01E05.eng.ass", tmp_path)], []
+    )
+
+    assert files(tracks) == {"notes.txt": "keep"}
+
+
+def test_rename_all_names_the_folders_of_two_files_with_one_target(tmp_path, capsys):
+    for folder in ("A", "B"):
+        (tmp_path / folder).mkdir()
+        make(tmp_path / folder, **{"Show - 05.mka": folder})
+    pending = [
+        Rename(tmp_path / folder / "Show - 05.mka", "S01E05.rus.mka", tmp_path)
+        for folder in ("A", "B")
+    ]
+
+    code = _renaming.rename_all(tmp_path, pending, [])
+
+    assert code == 1
+    assert "from A/Show - 05.mka and B/Show - 05.mka" in capsys.readouterr().out

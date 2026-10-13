@@ -21,14 +21,23 @@ from _prompts import Option, choose_many, confirm, interactive
 class Rename:
     source: Path
     target: str
+    destination: Path | None = None
 
     @property
     def settled(self) -> bool:
-        return self.target == self.source.name
+        return self.target_path == self.source
 
     @property
     def target_path(self) -> Path:
-        return self.source.with_name(self.target)
+        return (self.destination or self.source.parent) / self.target
+
+    @property
+    def moved(self) -> bool:
+        return self.target_path.parent != self.source.parent
+
+    @property
+    def label(self) -> str:
+        return str(self.source.relative_to(self.target_path.parent, walk_up=True))
 
     def left_alone(self) -> "Rename":
         return Rename(self.source, self.source.name)
@@ -38,29 +47,29 @@ def pad(digits: str | int, width: int) -> str:
     return f"{int(digits):0{width}d}"
 
 
-def find_collisions(renames: list[Rename]) -> list[tuple[str, Path, Path]]:
-    claimed: dict[str, Path] = {}
+def find_collisions(renames: list[Rename]) -> list[tuple[Rename, Rename]]:
+    claimed: dict[Path, Rename] = {}
     collisions = []
     for rename in renames:
-        previous = claimed.setdefault(rename.target, rename.source)
-        if previous is not rename.source:
-            collisions.append((rename.target, previous, rename.source))
+        previous = claimed.setdefault(rename.target_path, rename)
+        if previous is not rename:
+            collisions.append((previous, rename))
     return collisions
 
 
 def order_renames(
-    pending: list[Rename], existing: set[str]
+    pending: list[Rename], existing: set[Path]
 ) -> tuple[list[Rename], list[Rename]]:
     occupied = set(existing)
     waiting = list(pending)
     ordered: list[Rename] = []
     while waiting:
-        ready = [rename for rename in waiting if rename.target not in occupied]
+        ready = [rename for rename in waiting if rename.target_path not in occupied]
         if not ready:
             break
         for rename in ready:
-            occupied.discard(rename.source.name)
-            occupied.add(rename.target)
+            occupied.discard(rename.source)
+            occupied.add(rename.target_path)
         ordered += ready
         waiting = [rename for rename in waiting if rename not in ready]
     return ordered, waiting
@@ -73,10 +82,10 @@ def build_preview(renames: list[Rename]) -> Table:
     table.add_column(overflow="ellipsis")
     for rename in renames:
         if rename.settled:
-            table.add_row(escape(rename.source.name), "·", "[dim]unchanged[/]")
+            table.add_row(escape(rename.label), "·", "[dim]unchanged[/]")
         else:
             table.add_row(
-                escape(rename.source.name),
+                escape(rename.label),
                 "→",
                 f"[success]{escape(rename.target)}[/]",
             )
@@ -108,11 +117,11 @@ def show_preview(renames: list[Rename], skipped: list[Path]) -> None:
     console.print(f"[question]{summary}[/]\n")
 
 
-def show_collisions(collisions: list[tuple[str, Path, Path]]) -> None:
+def show_collisions(collisions: list[tuple[Rename, Rename]]) -> None:
     print_error("two files resolve to the same name")
-    for target, first, second in collisions:
+    for first, second in collisions:
         console.print(
-            f"  [failure]{escape(target)}[/] from [dim]{escape(first.name)}[/] and [dim]{escape(second.name)}[/]"
+            f"  [failure]{escape(first.target)}[/] from [dim]{escape(first.label)}[/] and [dim]{escape(second.label)}[/]"
         )
 
 
@@ -120,7 +129,7 @@ def show_blocked(blocked: list[Rename]) -> None:
     print_error("these names are taken by files that would not move")
     for rename in blocked:
         console.print(
-            f"  [failure]{escape(rename.target)}[/] wanted by [dim]{escape(rename.source.name)}[/]"
+            f"  [failure]{escape(rename.target)}[/] wanted by [dim]{escape(rename.label)}[/]"
         )
 
 
@@ -133,22 +142,35 @@ def apply_renames(renames: list[Rename]) -> int:
             rename.source.rename(rename.target_path)
         except OSError as error:
             console.print(
-                f"  [failure]x[/] {escape(rename.source.name)}: {escape(str(error))}"
+                f"  [failure]x[/] {escape(rename.label)}: {escape(str(error))}"
             )
             failures += 1
         else:
             console.print(
-                f"  [success]+[/] {escape(rename.source.name)} [dim]->[/] {escape(rename.target)}"
+                f"  [success]+[/] {escape(rename.label)} [dim]->[/] {escape(rename.target)}"
             )
     return failures
+
+
+def remove_emptied_folders(renames: list[Rename]) -> None:
+    for rename in renames:
+        if not rename.moved:
+            continue
+        destination = rename.target_path.parent
+        folder = rename.source.parent
+        while folder != destination and folder.is_relative_to(destination):
+            try:
+                folder.rmdir()
+            except OSError:
+                break
+            console.print(f"  [dim]- removed empty {escape(folder.name)}/[/]")
+            folder = folder.parent
 
 
 def pick_renames(renames: list[Rename], skipped: list[Path]) -> list[Rename]:
     pending = [rename for rename in renames if not rename.settled]
     show_skipped(skipped)
-    options = [
-        Option(rename, (rename.source.name, "→", rename.target)) for rename in pending
-    ]
+    options = [Option(rename, (rename.label, "→", rename.target)) for rename in pending]
     chosen = choose_many(
         f"rename {plural(len(pending), 'file')}", options, pending, required=True
     )
@@ -177,9 +199,7 @@ def rename_all(directory: Path, renames: list[Rename], skipped: list[Path]) -> i
         show_collisions(collisions)
         return 1
 
-    ordered, blocked = order_renames(
-        pending, {path.name for path in directory.iterdir()}
-    )
+    ordered, blocked = order_renames(pending, set(directory.iterdir()))
     if blocked:
         show_blocked(blocked)
         return 1
@@ -189,6 +209,7 @@ def rename_all(directory: Path, renames: list[Rename], skipped: list[Path]) -> i
         return 1
 
     failures = apply_renames(ordered)
+    remove_emptied_folders(ordered)
     if failures:
         console.print(f"\n[failure]done with {plural(failures, 'error')}[/]")
         return 1
