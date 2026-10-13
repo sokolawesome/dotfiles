@@ -147,6 +147,14 @@ def test_typed_text_asks_until_the_check_passes(monkeypatch, capsys):
     assert "digits only" in out
 
 
+def test_typed_text_accepts_an_empty_answer_when_not_required(monkeypatch):
+    answer(monkeypatch, "")
+
+    answer_text = _prompts.ask_text("name", required=False)
+
+    assert answer_text == ""
+
+
 @pytest.mark.parametrize(
     ("typed", "agreed"), [("y", True), ("Yes", True), ("n", False)]
 )

@@ -328,10 +328,11 @@ def ask_text(
     default: str = "",
     completions: Sequence[str] = (),
     check: Callable[[str], str | None] = lambda answer: None,
+    required: bool = True,
 ) -> str:
     def problem(answer: str) -> str | None:
         if not answer:
-            return REQUIRED_ANSWER
+            return REQUIRED_ANSWER if required else None
         return check(answer)
 
     if interactive():
