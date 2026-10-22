@@ -28,17 +28,24 @@ def test_keeps_only_the_picked_tracks(tmp_path, monkeypatch, capsys):
 
 
 @needs_tools
-def test_a_kind_you_did_not_pick_stays_untouched(tmp_path, monkeypatch):
+def test_a_kind_you_did_not_pick_is_removed(tmp_path, monkeypatch):
     movie = make_mkv(tmp_path / "a.mkv", audio=["eng", "jpn"], subtitles=["eng", "rus"])
     answer(monkeypatch, "1", "y")
 
     mkv.main([str(tmp_path)])
 
-    assert tracks_in(movie) == [
-        ("audio", "eng", ""),
-        ("subtitles", "eng", ""),
-        ("subtitles", "rus", ""),
-    ]
+    assert tracks_in(movie) == [("audio", "eng", "")]
+
+
+@needs_tools
+def test_picking_every_track_of_one_kind_still_removes_the_other(tmp_path, monkeypatch):
+    movie = make_mkv(tmp_path / "a.mkv", audio=["eng"], subtitles=["eng", "rus"])
+    answer(monkeypatch, "1", "y")
+
+    code = mkv.main([str(tmp_path)])
+
+    assert code == 0
+    assert tracks_in(movie) == [("audio", "eng", "")]
 
 
 @needs_tools

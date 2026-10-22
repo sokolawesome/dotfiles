@@ -4,7 +4,7 @@
 import argparse
 import os
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.markup import escape
@@ -68,7 +68,6 @@ class FilePlan:
     path: Path
     keep: tuple[Track, ...]
     missing: tuple[Selection, ...]
-    kinds: frozenset[str] = field(default_factory=frozenset)
     tracks: tuple[Track, ...] = ()
 
     def ids_for(self, kind: str) -> list[int]:
@@ -83,19 +82,18 @@ class FilePlan:
         return any(
             set(self.ids_for(kind))
             != {track.track_id for track in self.tracks if track.kind == kind}
-            for kind in self.kinds
+            for kind in SELECTABLE_TYPES
         )
 
 
 def build_plan(
     scans: list[FileScan], selections: list[Selection], ask: bool
 ) -> list[FilePlan]:
-    kinds = frozenset(selection.kind for selection in selections)
     plans = []
     for scan in scans:
         keep = resolve_picks(selections, scan, ask)
         missing = tuple(s for s in selections if not picked_for(s, scan))
-        plans.append(FilePlan(scan.path, tuple(keep), missing, kinds, scan.tracks))
+        plans.append(FilePlan(scan.path, tuple(keep), missing, scan.tracks))
     return plans
 
 
@@ -105,7 +103,7 @@ def strip_command(plan: FilePlan, mkvmerge: str) -> list[str]:
         ids = plan.ids_for(kind)
         if ids:
             command += [MKVMERGE_FLAGS[kind], ",".join(str(i) for i in ids)]
-        elif kind in plan.kinds:
+        else:
             command.append(MKVMERGE_DROP_FLAGS[kind])
     command.append(str(plan.path))
     return command
@@ -156,7 +154,7 @@ def build_plan_table(plans: list[FilePlan]) -> Table:
         heading = first.path.name if len(members) == 1 else f"{len(members)} files"
         audio = track_summary([track for track in first.keep if track.kind == AUDIO])
         subs = track_summary([track for track in first.keep if track.kind == SUBTITLES])
-        if first.kinds and not first.changes_file:
+        if not first.changes_file:
             note = "[dim]nothing to strip[/]"
         elif first.missing:
             note = f"[dim]missing: {escape(describe_missing(first.missing))}[/]"
