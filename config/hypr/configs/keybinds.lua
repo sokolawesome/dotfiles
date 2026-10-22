@@ -20,7 +20,7 @@ hl.bind("XF86MonBrightnessDown", ipc("brightness-down"), { locked = true, repeat
 -- app launchers
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("kitty"))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("zen-browser"))
-hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("code"))
+hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("zeditor"))
 hl.bind(mainMod .. " + D", ipc("panel-toggle launcher"))
 hl.bind(mainMod .. " + SHIFT + D", ipc("launcher windows"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("kitty -e yazi"))
