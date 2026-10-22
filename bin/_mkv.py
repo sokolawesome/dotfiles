@@ -193,14 +193,22 @@ def probe_all(paths: list[Path], mkvmerge: str) -> list[FileScan]:
     return scans
 
 
-def scan_files(directory: Path) -> list[Path]:
-    if not directory.is_dir():
-        raise MkvError(f"not a directory: {directory}")
-    return [
-        p
-        for p in sorted(directory.iterdir())
-        if p.is_file() and p.suffix.lower() == MKV_SUFFIX
-    ]
+def is_mkv(path: Path) -> bool:
+    return path.is_file() and path.suffix.lower() == MKV_SUFFIX
+
+
+def scan_files(paths: list[Path]) -> list[Path]:
+    found: dict[Path, None] = {}
+    for path in paths:
+        if path.is_dir():
+            found.update(dict.fromkeys(p for p in sorted(path.iterdir()) if is_mkv(p)))
+        elif is_mkv(path):
+            found[path] = None
+        elif path.exists():
+            raise MkvError(f"not an mkv file or directory: {path}")
+        else:
+            raise MkvError(f"no such file or directory: {path}")
+    return list(found)
 
 
 def supported_subtitle(track: Track) -> bool:

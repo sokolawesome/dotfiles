@@ -306,10 +306,14 @@ def build_parser() -> argparse.ArgumentParser:
         prog="mkv_extract_tracks",
         formatter_class=RichHelpFormatter,
         description="extract audio and subtitle tracks from mkv files into files next to them",
-        epilog="pass a directory to scan it, defaults to the current one",
+        epilog="pass mkv files or directories to scan, defaults to the current directory",
     )
     parser.add_argument(
-        "directory", nargs="?", type=Path, default=Path("."), help="directory to scan"
+        "paths",
+        nargs="*",
+        type=Path,
+        default=[Path(".")],
+        help="mkv files or directories to scan",
     )
     return parser
 
@@ -320,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         mkvmerge = find_tool("mkvmerge")
         mkvextract = find_tool("mkvextract")
-        paths = scan_files(args.directory)
+        paths = scan_files(args.paths)
     except MkvError as error:
         print_error(str(error))
         return 1

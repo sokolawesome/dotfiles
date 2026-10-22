@@ -105,6 +105,22 @@ def test_the_extension_follows_the_codec(codec, extension):
     assert mkv.extension_for(codec) == extension
 
 
+def test_files_and_directories_can_be_mixed_without_duplicates(tmp_path):
+    season = tmp_path / "season"
+    season.mkdir()
+    for path in (
+        season / "b.mkv",
+        season / "a.MKV",
+        season / "c.srt",
+        tmp_path / "x.mkv",
+    ):
+        path.write_text("")
+
+    found = mkv.scan_files([tmp_path / "x.mkv", season, season / "a.MKV"])
+
+    assert found == [tmp_path / "x.mkv", season / "a.MKV", season / "b.mkv"]
+
+
 def test_a_track_without_a_language_counts_as_undetermined():
     (track,) = mkv.parse_tracks(identify(("audio", {})))
 

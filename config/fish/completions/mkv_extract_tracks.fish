@@ -5,3 +5,4 @@ complete -c mkv_extract_tracks \
     -d "show this help message"
 
 complete -c mkv_extract_tracks -k -f -a "(__fish_complete_directories)"
+complete -c mkv_extract_tracks -k -f -a "(__fish_complete_suffix .mkv | string match -i -- '*.mkv')"

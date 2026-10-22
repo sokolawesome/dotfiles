@@ -272,11 +272,34 @@ def test_nothing_to_work_with_is_an_error(tmp_path, capsys, names, message):
     assert message in capsys.readouterr().out
 
 
-def test_a_missing_directory_is_an_error(tmp_path, capsys):
+def test_a_missing_path_is_an_error(tmp_path, capsys):
     code = mkv.main([str(tmp_path / "nope")])
 
     assert code == 1
-    assert "not a directory" in capsys.readouterr().out
+    assert "no such file or directory" in capsys.readouterr().out
+
+
+def test_a_file_that_is_not_an_mkv_is_an_error(tmp_path, capsys):
+    notes = tmp_path / "notes.txt"
+    notes.write_text("hi")
+
+    code = mkv.main([str(notes)])
+
+    assert code == 1
+    assert "not an mkv file or directory" in capsys.readouterr().out
+
+
+@needs_tools
+def test_only_the_passed_files_are_stripped(tmp_path, monkeypatch):
+    picked = make_mkv(tmp_path / "a.mkv", audio=["eng"], subtitles=["eng"])
+    other = make_mkv(tmp_path / "b.mkv", audio=["eng"], subtitles=["eng"])
+    answer(monkeypatch, "1", "y")
+
+    code = mkv.main([str(picked)])
+
+    assert code == 0
+    assert tracks_in(picked) == [("audio", "eng", "")]
+    assert tracks_in(other) == [("audio", "eng", ""), ("subtitles", "eng", "")]
 
 
 @needs_tools
