@@ -212,22 +212,6 @@ def test_ctrl_c_during_extraction_removes_the_half_written_files(tmp_path, monke
 
 
 @pytest.mark.parametrize(
-    ("codec", "extension"),
-    [
-        ("A_AAC/MPEG4/LC", "aac"),
-        ("A_EAC3", "eac3"),
-        ("A_OPUS", "opus"),
-        ("S_TEXT/UTF8", "srt"),
-        ("S_TEXT/ASS", "ass"),
-        ("S_HDMV/PGS", "sup"),
-        ("V_UNKNOWN", "bin"),
-    ],
-)
-def test_the_extension_follows_the_codec(codec, extension):
-    assert mkv.extension_for(codec) == extension
-
-
-@pytest.mark.parametrize(
     ("name", "expected"),
     [
         ("AniLibria", "Show.rus.AniLibria.ass"),

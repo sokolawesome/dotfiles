@@ -50,36 +50,6 @@ UNSAFE_IN_NAMES = re.compile(r"[/\x00]")
 SKIP = "skip"
 OVERWRITE = "overwrite"
 CANCEL = "cancel"
-EXTENSIONS = (
-    ("A_AAC", "aac"),
-    ("A_AC3", "ac3"),
-    ("A_EAC3", "eac3"),
-    ("A_DTS", "dts"),
-    ("A_FLAC", "flac"),
-    ("A_MPEG/L2", "mp2"),
-    ("A_MPEG/L3", "mp3"),
-    ("A_OPUS", "opus"),
-    ("A_VORBIS", "ogg"),
-    ("A_PCM", "wav"),
-    ("A_TRUEHD", "thd"),
-    ("A_MLP", "mlp"),
-    ("A_ALAC", "caf"),
-    ("A_TTA1", "tta"),
-    ("A_WAVPACK4", "wv"),
-    ("S_TEXT/UTF8", "srt"),
-    ("S_TEXT/ASCII", "srt"),
-    ("S_TEXT/ASS", "ass"),
-    ("S_ASS", "ass"),
-    ("S_TEXT/SSA", "ssa"),
-    ("S_SSA", "ssa"),
-    ("S_TEXT/WEBVTT", "vtt"),
-    ("S_TEXT/USF", "usf"),
-    ("S_HDMV/PGS", "sup"),
-    ("S_HDMV/TEXTST", "textst"),
-    ("S_VOBSUB", "sub"),
-    ("S_KATE", "ogg"),
-)
-FALLBACK_EXTENSION = "bin"
 
 
 @dataclass(frozen=True)
@@ -108,13 +78,6 @@ class ExtractResult:
     @property
     def size(self) -> int:
         return sum(size_of(path) for path in self.written)
-
-
-def extension_for(codec: str) -> str:
-    for prefix, extension in EXTENSIONS:
-        if codec.startswith(prefix):
-            return extension
-    return FALLBACK_EXTENSION
 
 
 def key_of(track: Track) -> tuple[str, str, str]:
@@ -152,7 +115,7 @@ def output_path(movie: Path, track: Track, label: str, tagged: bool) -> Path:
     if tagged:
         parts.append(str(track.track_id))
     stem = ".".join(part for part in parts if part)
-    return movie.with_name(f"{stem}.{extension_for(track.codec)}")
+    return movie.with_name(f"{stem}.{track.extension}")
 
 
 def outputs_for(

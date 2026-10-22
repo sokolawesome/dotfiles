@@ -60,6 +60,51 @@ def test_only_supported_subtitle_languages_are_offered():
     ]
 
 
+def test_each_track_name_is_listed_with_its_formats():
+    scans = [
+        mkv.FileScan(
+            Path(name),
+            mkv.parse_tracks(
+                identify(
+                    (
+                        "subtitles",
+                        {"language": "rus", "track_name": "full", "codec_id": first},
+                    ),
+                    (
+                        "subtitles",
+                        {
+                            "language": "rus",
+                            "track_name": "forced",
+                            "codec_id": "S_TEXT/ASS",
+                        },
+                    ),
+                )
+            ),
+        )
+        for name, first in (("a.mkv", "S_HDMV/PGS"), ("b.mkv", "S_TEXT/UTF8"))
+    ]
+
+    labels = mkv.labels_for(mkv.Selection(mkv.SUBTITLES, "rus"), scans)
+
+    assert labels == ["full (pgs/srt)", "forced (ass)"]
+
+
+@pytest.mark.parametrize(
+    ("codec", "extension"),
+    [
+        ("A_AAC/MPEG4/LC", "aac"),
+        ("A_EAC3", "eac3"),
+        ("A_OPUS", "opus"),
+        ("S_TEXT/UTF8", "srt"),
+        ("S_TEXT/ASS", "ass"),
+        ("S_HDMV/PGS", "sup"),
+        ("V_UNKNOWN", "bin"),
+    ],
+)
+def test_the_extension_follows_the_codec(codec, extension):
+    assert mkv.extension_for(codec) == extension
+
+
 def test_a_track_without_a_language_counts_as_undetermined():
     (track,) = mkv.parse_tracks(identify(("audio", {})))
 

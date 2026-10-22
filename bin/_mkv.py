@@ -34,6 +34,50 @@ SUPPORTED_SUBTITLE_LANGUAGES = (
     "es",
     "spa",
 )
+EXTENSIONS = (
+    ("A_AAC", "aac"),
+    ("A_AC3", "ac3"),
+    ("A_EAC3", "eac3"),
+    ("A_DTS", "dts"),
+    ("A_FLAC", "flac"),
+    ("A_MPEG/L2", "mp2"),
+    ("A_MPEG/L3", "mp3"),
+    ("A_OPUS", "opus"),
+    ("A_VORBIS", "ogg"),
+    ("A_PCM", "wav"),
+    ("A_TRUEHD", "thd"),
+    ("A_MLP", "mlp"),
+    ("A_ALAC", "caf"),
+    ("A_TTA1", "tta"),
+    ("A_WAVPACK4", "wv"),
+    ("S_TEXT/UTF8", "srt"),
+    ("S_TEXT/ASCII", "srt"),
+    ("S_TEXT/ASS", "ass"),
+    ("S_ASS", "ass"),
+    ("S_TEXT/SSA", "ssa"),
+    ("S_SSA", "ssa"),
+    ("S_TEXT/WEBVTT", "vtt"),
+    ("S_TEXT/USF", "usf"),
+    ("S_HDMV/PGS", "sup"),
+    ("S_HDMV/TEXTST", "textst"),
+    ("S_VOBSUB", "sub"),
+    ("S_KATE", "ogg"),
+)
+FALLBACK_EXTENSION = "bin"
+FORMAT_NAMES = {
+    "sup": "pgs",
+    "sub": "vobsub",
+    "thd": "truehd",
+    "caf": "alac",
+    "wav": "pcm",
+}
+
+
+def extension_for(codec: str) -> str:
+    for prefix, extension in EXTENSIONS:
+        if codec.startswith(prefix):
+            return extension
+    return FALLBACK_EXTENSION
 
 
 class MkvError(Exception):
@@ -52,6 +96,14 @@ class Track:
     @property
     def label(self) -> str:
         return self.name or "unnamed"
+
+    @property
+    def extension(self) -> str:
+        return extension_for(self.codec)
+
+    @property
+    def format(self) -> str:
+        return FORMAT_NAMES.get(self.extension, self.extension)
 
     def speaks(self, wanted: str) -> bool:
         return wanted in (self.language, self.alias)
@@ -201,8 +253,22 @@ def files_per_name(selection: Selection, scans: list[FileScan]) -> Counter[str]:
     )
 
 
+def formats_of(name: str, selection: Selection, scans: list[FileScan]) -> str:
+    return "/".join(
+        dict.fromkeys(
+            track.format
+            for scan in scans
+            for track in matches_for(selection, scan)
+            if track.name == name
+        )
+    )
+
+
 def labels_for(selection: Selection, scans: list[FileScan]) -> list[str]:
-    return [name or "unnamed" for name in files_per_name(selection, scans)]
+    return [
+        f"{name or 'unnamed'} ({formats_of(name, selection, scans)})"
+        for name in files_per_name(selection, scans)
+    ]
 
 
 def narrowed_by_name(
@@ -212,7 +278,11 @@ def narrowed_by_name(
     if len(counts) < 2:
         return selection
     options = [
-        Option(name, (name or "unnamed",), plural(count, "file"))
+        Option(
+            name,
+            (name or "unnamed", formats_of(name, selection, scans)),
+            plural(count, "file"),
+        )
         for name, count in counts.items()
     ]
     names = choose_many(
@@ -232,7 +302,7 @@ def choose_interactively(
             (
                 selection.kind,
                 selection.language,
-                ", ".join(labels_for(selection, scans)) or "unnamed",
+                ", ".join(labels_for(selection, scans)),
             ),
             plural(presence_of(selection, scans), "file"),
         )
@@ -270,7 +340,7 @@ def resolve_picks(
 def pick_other_name(selection: Selection, scan: FileScan) -> list[Track]:
     names = ", ".join(sorted(name or "unnamed" for name in selection.names or ()))
     options = [
-        Option(track, (track.label,), track.codec)
+        Option(track, (track.label, track.format))
         for track in matches_for(selection, scan)
     ]
     return choose_many(
@@ -286,7 +356,8 @@ def pick_from_available(selection: Selection, scan: FileScan) -> list[Track]:
     if not available:
         return []
     options = [
-        Option(track, (track.language, track.label), track.codec) for track in available
+        Option(track, (track.language, track.label, track.format))
+        for track in available
     ]
     return choose_many(
         f"{scan.path.name}: no {selection.language} {selection.kind}, pick a replacement",
