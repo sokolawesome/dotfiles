@@ -102,9 +102,11 @@ reflector
 resvg
 ripgrep
 ruff
+rust
 smartmontools
 socat
 sshfs
+sshs
 starship
 steam
 stow
@@ -134,6 +136,7 @@ xsettingsd
 yazi
 zathura-pdf-poppler
 zed
+zellij
 zip
 zoxide
 zram-generator

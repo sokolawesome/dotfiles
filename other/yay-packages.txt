@@ -3,10 +3,9 @@ bibata-cursor-git
 claude-desktop-extra
 dualsensectl
 helium-browser-bin
-lazyssh-bin
-orca-ide-bin
+localsend-bin
 proton-community-updater
 rmlint
-visual-studio-code-bin
+spotifast-bin
 yay
 zen-browser-bin
