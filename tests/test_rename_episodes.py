@@ -41,6 +41,13 @@ def files(directory):
         ("Show_Name_07.mkv", (None, "07")),
         ("Show Name 07.mkv", (None, "07")),
         ("Show (x265 10bit) - 03.mkv", (None, "03")),
+        (
+            "[UQW] Toradora! - Ep01 [BD 1080p AVC-YUV420P10 FLAC].eng.ass",
+            (None, "01"),
+        ),
+        ("Show Ep 12.mkv", (None, "12")),
+        ("Show.Ep.7.mkv", (None, "07")),
+        ("Show Episode 3.mkv", (None, "03")),
     ],
 )
 def test_episode_number(name, expected):
